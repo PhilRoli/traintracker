@@ -1,0 +1,182 @@
+// Tests/TrainTrackerTests/TrainFetcherTests.swift
+import XCTest
+@testable import TrainTracker
+
+final class TrainFetcherTests: XCTestCase {
+    let fetcher = TrainFetcher(client: OeBBClient())
+
+    // MARK: - parseDate
+
+    func test_parseDate_validISO8601WithOffset() {
+        let date = TrainFetcher.parseDate("2026-05-24T12:56:00+02:00")
+        XCTAssertNotNil(date)
+        // Verify the absolute timestamp: 12:56 CEST = 10:56 UTC
+        let cal = Calendar(identifier: .gregorian)
+        var utc = TimeZone(identifier: "UTC")!
+        var components = cal.dateComponents(in: utc, from: date!)
+        XCTAssertEqual(components.hour, 10)
+        XCTAssertEqual(components.minute, 56)
+    }
+
+    func test_parseDate_nilForEmpty() {
+        XCTAssertNil(TrainFetcher.parseDate(nil))
+        XCTAssertNil(TrainFetcher.parseDate(""))
+        XCTAssertNil(TrainFetcher.parseDate("not-a-date"))
+    }
+
+    // MARK: - deduplicated
+
+    func test_deduplicated_removesJourneysWithSameTrainAndDeparture() {
+        let journey = makeJourney(trainName: "WB 912", plannedDep: "2026-05-24T12:56:00+02:00")
+        let duplicate = makeJourney(trainName: "WB 912", plannedDep: "2026-05-24T12:56:00+02:00")
+        let different = makeJourney(trainName: "WB 914", plannedDep: "2026-05-24T13:56:00+02:00")
+
+        let result = TrainFetcher.deduplicated([journey, duplicate, different])
+        XCTAssertEqual(result.count, 2)
+    }
+
+    func test_deduplicated_keepsSameTrainDifferentDeparture() {
+        let morning = makeJourney(trainName: "WB 912", plannedDep: "2026-05-24T08:56:00+02:00")
+        let afternoon = makeJourney(trainName: "WB 912", plannedDep: "2026-05-24T12:56:00+02:00")
+
+        let result = TrainFetcher.deduplicated([morning, afternoon])
+        XCTAssertEqual(result.count, 2)
+    }
+
+    // MARK: - buildOptions (no arrival time filter)
+
+    func test_buildOptions_includesArrivedTrains() {
+        // Train that arrived 2 hours ago — must still appear in options
+        let now = Date()
+        let departed = now.addingTimeInterval(-4 * 3600)
+        let arrived = now.addingTimeInterval(-2 * 3600)
+        let journey = makeJourney(
+            trainName: "WB 910",
+            plannedDep: iso8601(departed),
+            plannedArr: iso8601(arrived)
+        )
+
+        let options = fetcher.buildOptions(from: [journey])
+        XCTAssertEqual(options.count, 1, "Arrived train must still appear so user can select mid-journey")
+        XCTAssertEqual(options[0].name, "WB 910")
+    }
+
+    func test_buildOptions_sortedByDeparture() {
+        let now = Date()
+        let j1 = makeJourney(trainName: "WB 914", plannedDep: iso8601(now.addingTimeInterval(3600)),
+                             plannedArr: iso8601(now.addingTimeInterval(7200)))
+        let j2 = makeJourney(trainName: "WB 912", plannedDep: iso8601(now.addingTimeInterval(-3600)),
+                             plannedArr: iso8601(now.addingTimeInterval(600)))
+
+        let options = fetcher.buildOptions(from: [j1, j2])
+        XCTAssertEqual(options.count, 2)
+        XCTAssertEqual(options[0].name, "WB 912")   // earlier departure first
+        XCTAssertEqual(options[1].name, "WB 914")
+    }
+
+    // MARK: - findTrain
+
+    func test_findTrain_exactNameMatch() {
+        let now = Date()
+        let j = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-3600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600))
+        )
+
+        let result = fetcher.findTrain(named: "WB 912", in: [j], now: now)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.trainName, "WB 912")
+    }
+
+    func test_findTrain_returnsNilForNoMatch() {
+        let now = Date()
+        let j = makeJourney(trainName: "WB 912", plannedDep: iso8601(now), plannedArr: iso8601(now.addingTimeInterval(3600)))
+
+        let result = fetcher.findTrain(named: "RJX 860", in: [j], now: now)
+        XCTAssertNil(result)
+    }
+
+    func test_findTrain_setsIsEnRouteCorrectly() {
+        let now = Date()
+        // departed 30 minutes ago
+        let j = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-1800)),
+            plannedArr: iso8601(now.addingTimeInterval(3600))
+        )
+
+        let result = fetcher.findTrain(named: "WB 912", in: [j], now: now)
+        XCTAssertEqual(result?.isEnRoute, true)
+    }
+
+    // MARK: - buildStopovers
+
+    func test_buildStopovers_marksPassedAndNextStop() {
+        let now = Date()
+        let past = now.addingTimeInterval(-600)
+        let future1 = now.addingTimeInterval(600)
+        let future2 = now.addingTimeInterval(1200)
+
+        // stopovers: origin, passed-intermediate, next-intermediate, destination
+        let stopovers: [APIStopover] = [
+            makeStopover(name: "Origin", dep: iso8601(now.addingTimeInterval(-3600))),
+            makeStopover(name: "Passed Stop", arr: iso8601(past)),
+            makeStopover(name: "Next Stop", arr: iso8601(future1)),
+            makeStopover(name: "Future Stop", arr: iso8601(future2)),
+            makeStopover(name: "Destination", arr: iso8601(now.addingTimeInterval(3600)))
+        ]
+
+        let result = fetcher.buildStopovers(stopovers: stopovers, now: now)
+        // origin and destination are stripped: 3 intermediate stops remain
+        XCTAssertEqual(result.count, 3)
+        XCTAssertTrue(result[0].passed,   "Passed Stop should be marked passed")
+        XCTAssertFalse(result[0].isNext,  "Passed Stop should not be next")
+        XCTAssertFalse(result[1].passed,  "Next Stop should not be passed")
+        XCTAssertTrue(result[1].isNext,   "Next Stop should be marked next")
+        XCTAssertFalse(result[2].passed,  "Future Stop should not be passed")
+        XCTAssertFalse(result[2].isNext,  "Future Stop should not be next")
+    }
+
+    // MARK: - Helpers
+
+    private func makeJourney(
+        trainName: String,
+        plannedDep: String,
+        plannedArr: String = "2026-05-24T14:08:00+02:00"
+    ) -> APIJourney {
+        let leg = APILeg(
+            origin: APIStop(id: "1", name: "From"),
+            destination: APIStop(id: "2", name: "To"),
+            departure: plannedDep,
+            plannedDeparture: plannedDep,
+            arrival: plannedArr,
+            plannedArrival: plannedArr,
+            departureDelay: 0,
+            arrivalDelay: 0,
+            line: APILine(name: trainName, product: "interregional"),
+            departurePlatform: nil,
+            arrivalPlatform: nil,
+            stopovers: nil
+        )
+        return APIJourney(legs: [leg])
+    }
+
+    private func makeStopover(name: String, arr: String? = nil, dep: String? = nil) -> APIStopover {
+        APIStopover(
+            stop: APIStop(id: name, name: name),
+            arrival: arr,
+            plannedArrival: arr,
+            departure: dep,
+            plannedDeparture: dep,
+            arrivalDelay: nil,
+            departureDelay: nil
+        )
+    }
+
+    private func iso8601(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f.string(from: date)
+    }
+}
