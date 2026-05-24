@@ -46,14 +46,13 @@ final class StatusBarController {
 
     // MARK: - Title string (static for testability)
 
-    nonisolated static func titleString(for status: TrainStatus, consecutiveErrors: Int) -> String {
+    nonisolated static func titleString(for status: TrainStatus, consecutiveErrors: Int, now: Date = Date()) -> String {
         switch status {
         case .noConfig, .pickTrain:
             return "Train"
         case .error:
             return consecutiveErrors >= 2 ? "Train (!)" : "Train"
         case .tracking(let td, _):
-            let now = Date()
             let rtArr = td.scheduledArrival.addingTimeInterval(TimeInterval(td.arrivalDelaySecs))
             let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
 

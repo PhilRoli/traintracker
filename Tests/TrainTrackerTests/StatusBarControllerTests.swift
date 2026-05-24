@@ -24,7 +24,7 @@ final class StatusBarControllerTests: XCTestCase {
         let arr = now.addingTimeInterval(90 * 60)
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, depDelay: 0, isEnRoute: false)
 
-        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0)
+        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         XCTAssertEqual(title, "WB 912  in 12m")
     }
 
@@ -34,7 +34,7 @@ final class StatusBarControllerTests: XCTestCase {
         let arr = now.addingTimeInterval(72 * 60)   // arrives at now + 72 min → HH:MM
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 0, isEnRoute: true)
 
-        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0)
+        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         let expected = "WB 912  arr \(f.string(from: arr))"
@@ -47,7 +47,7 @@ final class StatusBarControllerTests: XCTestCase {
         let arr = now.addingTimeInterval(72 * 60)
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 180, isEnRoute: true)
 
-        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0)
+        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         let rtArr = arr.addingTimeInterval(180)
@@ -61,7 +61,7 @@ final class StatusBarControllerTests: XCTestCase {
         let arr = now.addingTimeInterval(-10 * 60)   // arrived 10 min ago
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 0, isEnRoute: true)
 
-        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0)
+        let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         XCTAssertEqual(title, "WB 912  Arrived")
     }
 
