@@ -12,8 +12,8 @@ final class TrainFetcherTests: XCTestCase {
         XCTAssertNotNil(date)
         // Verify the absolute timestamp: 12:56 CEST = 10:56 UTC
         let cal = Calendar(identifier: .gregorian)
-        var utc = TimeZone(identifier: "UTC")!
-        var components = cal.dateComponents(in: utc, from: date!)
+        let utc = TimeZone(identifier: "UTC")!
+        let components = cal.dateComponents(in: utc, from: date!)
         XCTAssertEqual(components.hour, 10)
         XCTAssertEqual(components.minute, 56)
     }
@@ -108,6 +108,19 @@ final class TrainFetcherTests: XCTestCase {
 
         let result = fetcher.findTrain(named: "WB 912", in: [j], now: now)
         XCTAssertEqual(result?.isEnRoute, true)
+    }
+
+    func test_findTrain_isNotEnRouteBeforeDeparture() {
+        let now = Date()
+        // departs in 30 minutes
+        let j = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(1800)),
+            plannedArr: iso8601(now.addingTimeInterval(5400))
+        )
+
+        let result = fetcher.findTrain(named: "WB 912", in: [j], now: now)
+        XCTAssertEqual(result?.isEnRoute, false)
     }
 
     // MARK: - buildStopovers
