@@ -144,8 +144,8 @@ struct AppConfig: Codable {
 | State | Title |
 |---|---|
 | Waiting to depart | `WB 912  in 12m` |
-| En route, delayed | `WB 912  arr 14:08 +3m` |
-| En route, on time | `WB 912  arr 14:08` |
+| En route, delayed | `WB 912 arr 14:08 +3m` |
+| En route, on time | `WB 912 arr 14:08` |
 | Arrived | `WB 912  Arrived` |
 | No config | `Train` |
 | Error | `Train (!)` |

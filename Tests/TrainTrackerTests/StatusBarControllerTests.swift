@@ -37,7 +37,7 @@ final class StatusBarControllerTests: XCTestCase {
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
-        let expected = "WB 912  arr \(f.string(from: arr))"
+        let expected = "WB 912 arr \(f.string(from: arr))"
         XCTAssertEqual(title, expected)
     }
 
@@ -51,7 +51,7 @@ final class StatusBarControllerTests: XCTestCase {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         let rtArr = arr.addingTimeInterval(180)
-        let expected = "WB 912  arr \(f.string(from: rtArr)) +3m"
+        let expected = "WB 912 arr \(f.string(from: rtArr)) +3m"
         XCTAssertEqual(title, expected)
     }
 

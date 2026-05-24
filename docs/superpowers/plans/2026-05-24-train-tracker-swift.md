@@ -33,6 +33,7 @@
 ## Task 1: Project Scaffolding
 
 **Files:**
+
 - Create: `Package.swift`
 - Create: `Sources/TrainTracker/main.swift`
 - Create: `Sources/TrainTracker/AppDelegate.swift`
@@ -119,9 +120,11 @@ final class StatusBarController {
 ```
 
 Run:
+
 ```bash
 swift build 2>&1 | tail -5
 ```
+
 Expected: `Build complete!`
 
 - [ ] **Step 7: Commit**
@@ -136,6 +139,7 @@ git commit -m "feat: scaffold Swift Package Manager project"
 ## Task 2: Data Models
 
 **Files:**
+
 - Create: `Sources/TrainTracker/Models.swift`
 - Create: `Tests/TrainTrackerTests/ModelsTests.swift`
 
@@ -205,6 +209,7 @@ final class ModelsTests: XCTestCase {
 ```bash
 swift test --filter ModelsTests 2>&1 | tail -10
 ```
+
 Expected: error — `APIJourneysResponse`, `APILocation` not found.
 
 - [ ] **Step 3: Write Models.swift**
@@ -308,6 +313,7 @@ struct TrainOption {
 ```bash
 swift test --filter ModelsTests 2>&1 | tail -5
 ```
+
 Expected: `Test Suite 'ModelsTests' passed`
 
 - [ ] **Step 5: Commit**
@@ -322,6 +328,7 @@ git commit -m "feat: add API response and display models"
 ## Task 3: Configuration Persistence
 
 **Files:**
+
 - Create: `Sources/TrainTracker/AppConfig.swift`
 - Create: `Tests/TrainTrackerTests/AppConfigTests.swift`
 
@@ -389,6 +396,7 @@ final class AppConfigTests: XCTestCase {
 ```bash
 swift test --filter AppConfigTests 2>&1 | tail -10
 ```
+
 Expected: error — `AppConfig`, `AppConfigStore`, `Station`, `SavedRoute` not found.
 
 - [ ] **Step 3: Write AppConfig.swift**
@@ -447,6 +455,7 @@ final class AppConfigStore {
 ```bash
 swift test --filter AppConfigTests 2>&1 | tail -5
 ```
+
 Expected: `Test Suite 'AppConfigTests' passed`
 
 - [ ] **Step 5: Commit**
@@ -461,6 +470,7 @@ git commit -m "feat: add configuration persistence with UserDefaults"
 ## Task 4: API Client
 
 **Files:**
+
 - Create: `Sources/TrainTracker/OeBBClient.swift`
 - Create: `Tests/TrainTrackerTests/OeBBClientTests.swift`
 
@@ -505,6 +515,7 @@ final class OeBBClientTests: XCTestCase {
 ```bash
 swift test --filter OeBBClientTests 2>&1 | tail -10
 ```
+
 Expected: error — `OeBBClient` not found.
 
 - [ ] **Step 3: Write OeBBClient.swift**
@@ -584,6 +595,7 @@ final class OeBBClient {
 ```bash
 swift test --filter OeBBClientTests 2>&1 | tail -5
 ```
+
 Expected: `Test Suite 'OeBBClientTests' passed`
 
 - [ ] **Step 5: Commit**
@@ -598,6 +610,7 @@ git commit -m "feat: add OeBB API client (URLSession wrapper)"
 ## Task 5: Train Fetcher (Core Business Logic)
 
 **Files:**
+
 - Create: `Sources/TrainTracker/TrainFetcher.swift`
 - Create: `Tests/TrainTrackerTests/TrainFetcherTests.swift`
 
@@ -793,6 +806,7 @@ final class TrainFetcherTests: XCTestCase {
 ```bash
 swift test --filter TrainFetcherTests 2>&1 | tail -10
 ```
+
 Expected: error — `TrainFetcher` not found.
 
 - [ ] **Step 3: Write TrainFetcher.swift**
@@ -959,6 +973,7 @@ final class TrainFetcher {
 ```bash
 swift test --filter TrainFetcherTests 2>&1 | tail -8
 ```
+
 Expected: `Test Suite 'TrainFetcherTests' passed`
 
 - [ ] **Step 5: Commit**
@@ -973,6 +988,7 @@ git commit -m "feat: add train fetcher with concurrent search and exact-match de
 ## Task 6: Status Bar — Title Formatting
 
 **Files:**
+
 - Replace: `Sources/TrainTracker/StatusBarController.swift` (was a stub)
 - Create: `Tests/TrainTrackerTests/StatusBarControllerTests.swift`
 
@@ -1018,7 +1034,7 @@ final class StatusBarControllerTests: XCTestCase {
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0)
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
-        let expected = "WB 912  arr \(f.string(from: arr))"
+        let expected = "WB 912 arr \(f.string(from: arr))"
         XCTAssertEqual(title, expected)
     }
 
@@ -1032,7 +1048,7 @@ final class StatusBarControllerTests: XCTestCase {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         let rtArr = arr.addingTimeInterval(180)
-        let expected = "WB 912  arr \(f.string(from: rtArr)) +3m"
+        let expected = "WB 912 arr \(f.string(from: rtArr)) +3m"
         XCTAssertEqual(title, expected)
     }
 
@@ -1068,6 +1084,7 @@ final class StatusBarControllerTests: XCTestCase {
 ```bash
 swift test --filter StatusBarControllerTests 2>&1 | tail -10
 ```
+
 Expected: error — `StatusBarController.titleString` not found (stub has no such method).
 
 - [ ] **Step 3: Replace stub with full StatusBarController.swift**
@@ -1133,16 +1150,16 @@ final class StatusBarController {
             let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
 
             if rtArr <= now {
-                return "\(td.trainName)  Arrived"
+                return "\(td.trainName) Arrived"
             } else if td.isEnRoute {
                 let timeStr = formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
                 let delay = formatDelay(td.arrivalDelaySecs)
                 return delay.isEmpty
-                    ? "\(td.trainName)  arr \(timeStr)"
-                    : "\(td.trainName)  arr \(timeStr) \(delay)"
+                    ? "\(td.trainName) arr \(timeStr)"
+                    : "\(td.trainName) arr \(timeStr) \(delay)"
             } else {
                 let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
-                return "\(td.trainName)  in \(mins)m"
+                return "\(td.trainName) in \(mins)m"
             }
         }
     }
@@ -1203,7 +1220,7 @@ final class StatusBarController {
     }
 
     private func addTrackingHeader(_ td: TrainData, to menu: NSMenu) {
-        menu.addItem(disabled("\(td.trainName)  \(td.fromName) → \(td.toName)"))
+        menu.addItem(disabled("\(td.trainName) \(td.fromName) → \(td.toName)"))
 
         let dep = Self.formatHHMM(td.scheduledDeparture, delaySecs: td.departureDelaySecs)
         let arr = Self.formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
@@ -1223,11 +1240,11 @@ final class StatusBarController {
             let timeStr = sv.scheduledArrival
                 .map { Self.formatHHMM($0, delaySecs: sv.arrivalDelaySecs) } ?? ""
             let prefix = sv.isNext ? "> " : "  "
-            let item = NSMenuItem(title: "\(prefix)\(sv.name)  \(timeStr)", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: "\(prefix)\(sv.name) \(timeStr)", action: nil, keyEquivalent: "")
             item.isEnabled = false
             if sv.passed {
                 item.attributedTitle = NSAttributedString(
-                    string: "\(prefix)\(sv.name)  \(timeStr)",
+                    string: "\(prefix)\(sv.name) \(timeStr)",
                     attributes: [.foregroundColor: NSColor.secondaryLabelColor]
                 )
             }
@@ -1242,7 +1259,7 @@ final class StatusBarController {
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
             let arr = f.string(from: opt.scheduledArrival)
             let item = NSMenuItem(
-                title: "\(opt.name)  \(dep) → \(arr)",
+                title: "\(opt.name) \(dep) → \(arr)",
                 action: #selector(selectTrain(_:)),
                 keyEquivalent: ""
             )
@@ -1303,6 +1320,7 @@ final class StatusBarController {
 ```bash
 swift test 2>&1 | tail -10
 ```
+
 Expected: all test suites pass.
 
 - [ ] **Step 5: Commit**
@@ -1317,6 +1335,7 @@ git commit -m "feat: add status bar controller with menu building and title form
 ## Task 7: Preferences Panel
 
 **Files:**
+
 - Create: `Sources/TrainTracker/PreferencesWindowController.swift`
 
 No unit tests for this task — it is programmatic AppKit UI that is best verified by running the app.
@@ -1583,6 +1602,7 @@ extension PreferencesWindowController: NSTableViewDataSource, NSTableViewDelegat
 ```bash
 swift build 2>&1 | tail -5
 ```
+
 Expected: `Build complete!`
 
 - [ ] **Step 3: Commit**
@@ -1597,6 +1617,7 @@ git commit -m "feat: add programmatic preferences panel with live station search
 ## Task 8: Integration — Wire Up and Smoke Test
 
 **Files:**
+
 - No new files. Verify the whole app runs end-to-end.
 
 - [ ] **Step 1: Run the full test suite**
@@ -1604,6 +1625,7 @@ git commit -m "feat: add programmatic preferences panel with live station search
 ```bash
 swift test 2>&1 | grep -E "(passed|failed|error)"
 ```
+
 Expected: all test suites show `passed`, zero failures.
 
 - [ ] **Step 2: Build a release binary**
@@ -1611,6 +1633,7 @@ Expected: all test suites show `passed`, zero failures.
 ```bash
 swift build -c release 2>&1 | tail -3
 ```
+
 Expected: `Build complete!`
 
 - [ ] **Step 3: Launch the app and verify the menu bar**
@@ -1620,6 +1643,7 @@ Expected: `Build complete!`
 ```
 
 Expected behaviour:
+
 - No dock icon appears
 - Menu bar item shows `Train`
 - Clicking it shows "Open Preferences to get started"
@@ -1640,7 +1664,7 @@ Expected: menu bar item still shows "Train" (no train number selected yet).
 
 Click the menu bar item — the menu should show a list of trains on the Linz → Salzburg route. Click "WB 912" (or whichever is departing closest to now).
 
-Expected: menu bar title updates to e.g. `WB 912  arr 14:08` or `WB 912  in 12m`.
+Expected: menu bar title updates to e.g. `WB 912 arr 14:08` or `WB 912  in 12m`.
 
 - [ ] **Step 6: Verify stopovers**
 

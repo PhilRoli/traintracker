@@ -59,16 +59,16 @@ final class StatusBarController {
             let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
 
             if rtArr <= now {
-                return "\(td.trainName)  Arrived"
+                return "\(td.trainName) Arrived"
             } else if td.isEnRoute {
                 let timeStr = formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
                 let delay = formatDelay(td.arrivalDelaySecs)
                 return delay.isEmpty
-                    ? "\(td.trainName)  arr \(timeStr)"
-                    : "\(td.trainName)  arr \(timeStr) \(delay)"
+                    ? "\(td.trainName) arr \(timeStr)"
+                    : "\(td.trainName) arr \(timeStr) \(delay)"
             } else {
                 let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
-                return "\(td.trainName)  in \(mins)m"
+                return "\(td.trainName) in \(mins)m"
             }
         }
     }
@@ -133,7 +133,7 @@ final class StatusBarController {
     }
 
     private func addTrackingHeader(_ td: TrainData, to menu: NSMenu) {
-        menu.addItem(disabled("\(td.trainName)  \(td.fromName) → \(td.toName)"))
+        menu.addItem(disabled("\(td.trainName) \(td.fromName) → \(td.toName)"))
 
         let dep = Self.formatHHMM(td.scheduledDeparture, delaySecs: td.departureDelaySecs)
         let arr = Self.formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
@@ -141,7 +141,7 @@ final class StatusBarController {
         let ad = Self.formatDelay(td.arrivalDelaySecs)
         let depStr = dd.isEmpty ? dep : "\(dep) \(dd)"
         let arrStr = ad.isEmpty ? arr : "\(arr) \(ad)"
-        menu.addItem(disabled("Dep: \(depStr)   Arr: \(arrStr)"))
+        menu.addItem(disabled("Dep: \(depStr) Arr: \(arrStr)"))
 
         if let dp = td.departurePlatform, let ap = td.arrivalPlatform {
             menu.addItem(disabled("Platform: \(dp) → \(ap)"))
@@ -153,11 +153,11 @@ final class StatusBarController {
             let timeStr = sv.scheduledArrival
                 .map { Self.formatHHMM($0, delaySecs: sv.arrivalDelaySecs) } ?? ""
             let prefix = sv.isNext ? "> " : "  "
-            let item = NSMenuItem(title: "\(prefix)\(sv.name)  \(timeStr)", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: "\(prefix)\(sv.name) \(timeStr)", action: nil, keyEquivalent: "")
             item.isEnabled = false
             if sv.passed {
                 item.attributedTitle = NSAttributedString(
-                    string: "\(prefix)\(sv.name)  \(timeStr)",
+                    string: "\(prefix)\(sv.name) \(timeStr)",
                     attributes: [.foregroundColor: NSColor.secondaryLabelColor]
                 )
             }
@@ -170,7 +170,7 @@ final class StatusBarController {
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
             let arr = Self.formatHHMM(opt.scheduledArrival, delaySecs: opt.arrivalDelaySecs)
             let item = NSMenuItem(
-                title: "\(opt.name)  \(dep) → \(arr)",
+                title: "\(opt.name) \(dep) → \(arr)",
                 action: #selector(selectTrain(_:)),
                 keyEquivalent: ""
             )
