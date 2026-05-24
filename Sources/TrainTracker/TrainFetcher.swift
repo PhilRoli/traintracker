@@ -75,7 +75,8 @@ final class TrainFetcher {
                 name: name,
                 scheduledDeparture: schDep,
                 scheduledArrival: schArr,
-                departureDelaySecs: leg.departureDelay ?? 0
+                departureDelaySecs: leg.departureDelay ?? 0,
+                arrivalDelaySecs: leg.arrivalDelay ?? 0
             ))
         }
         return options.sorted { $0.scheduledDeparture < $1.scheduledDeparture }

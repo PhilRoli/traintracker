@@ -161,11 +161,9 @@ final class StatusBarController {
     }
 
     private func addTrainOptions(_ options: [TrainOption], to menu: NSMenu, currentTrain: String?) {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
         for opt in options {
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
-            let arr = f.string(from: opt.scheduledArrival)
+            let arr = Self.formatHHMM(opt.scheduledArrival, delaySecs: opt.arrivalDelaySecs)
             let item = NSMenuItem(
                 title: "\(opt.name)  \(dep) → \(arr)",
                 action: #selector(selectTrain(_:)),

@@ -88,4 +88,5 @@ struct TrainOption {
     let scheduledDeparture: Date
     let scheduledArrival: Date
     let departureDelaySecs: Int
+    let arrivalDelaySecs: Int
 }
