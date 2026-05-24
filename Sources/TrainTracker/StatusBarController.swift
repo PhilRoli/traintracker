@@ -75,7 +75,7 @@ final class StatusBarController {
 
     // MARK: - Formatting helpers
 
-    private static let timeFormatter: DateFormatter = {
+    private nonisolated static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         return f

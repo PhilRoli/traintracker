@@ -131,7 +131,9 @@ final class PreferencesWindowController: NSWindowController {
         }
         searchTask?.cancel()
         searchTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-            self?.searchTask = Task { [weak self] in await self?.performSearch(query: query) }
+            MainActor.assumeIsolated {
+                self?.searchTask = Task { await self?.performSearch(query: query) }
+            }
         }
     }
 
@@ -199,9 +201,9 @@ final class PreferencesWindowController: NSWindowController {
         close()
     }
 
-    nonisolated override func close() {
+    @MainActor override func close() {
         super.close()
-        MainActor.assumeIsolated { onClose?() }
+        onClose?()
     }
 
     // MARK: - UI helpers
