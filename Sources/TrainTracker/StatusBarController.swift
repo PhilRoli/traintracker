@@ -51,9 +51,9 @@ final class StatusBarController {
     nonisolated static func titleString(for status: TrainStatus, consecutiveErrors: Int, now: Date = Date()) -> String {
         switch status {
         case .noConfig, .pickTrain:
-            return "Train"
+            return "🚂"
         case .error:
-            return consecutiveErrors >= 2 ? "Train (!)" : "Train"
+            return consecutiveErrors >= 2 ? "🚂 (!)" : "🚂"
         case .tracking(let td, _):
             let emoji = trainTypeEmoji(td.trainName)
             let rtArr = td.scheduledArrival.addingTimeInterval(TimeInterval(td.arrivalDelaySecs))
@@ -62,11 +62,11 @@ final class StatusBarController {
             if rtArr <= now {
                 return "\(emoji) \(td.trainName) Arrived"
             } else if td.isEnRoute {
-                let timeStr = formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
+                let minsLeft = max(0, Int(rtArr.timeIntervalSince(now) / 60))
                 let delay = formatDelay(td.arrivalDelaySecs)
                 return delay.isEmpty
-                    ? "\(emoji) \(td.trainName) arr \(timeStr)"
-                    : "\(emoji) \(td.trainName) arr \(timeStr) \(delay)"
+                    ? "\(emoji) \(td.trainName) \(minsLeft)m"
+                    : "\(emoji) \(td.trainName) \(minsLeft)m \(delay)"
             } else {
                 let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
                 return "\(emoji) \(td.trainName) in \(mins)m"

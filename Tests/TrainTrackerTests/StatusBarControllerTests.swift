@@ -5,17 +5,17 @@ import XCTest
 final class StatusBarControllerTests: XCTestCase {
     func test_titleForNoConfig() {
         let title = StatusBarController.titleString(for: .noConfig, consecutiveErrors: 0)
-        XCTAssertEqual(title, "Train")
+        XCTAssertEqual(title, "🚂")
     }
 
     func test_titleForPickTrain() {
         let title = StatusBarController.titleString(for: .pickTrain([]), consecutiveErrors: 0)
-        XCTAssertEqual(title, "Train")
+        XCTAssertEqual(title, "🚂")
     }
 
     func test_titleForErrorAfterTwoFailures() {
         let title = StatusBarController.titleString(for: .error("oops"), consecutiveErrors: 2)
-        XCTAssertEqual(title, "Train (!)")
+        XCTAssertEqual(title, "🚂 (!)")
     }
 
     func test_titleWaitingToDepartShowsCountdown() {
@@ -35,10 +35,7 @@ final class StatusBarControllerTests: XCTestCase {
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 0, isEnRoute: true)
 
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        let expected = "🟦 WB 912 arr \(f.string(from: arr))"
-        XCTAssertEqual(title, expected)
+        XCTAssertEqual(title, "🟦 WB 912 72m")
     }
 
     func test_titleEnRouteDelayed() {
@@ -48,11 +45,8 @@ final class StatusBarControllerTests: XCTestCase {
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 180, isEnRoute: true)
 
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        let rtArr = arr.addingTimeInterval(180)
-        let expected = "🟦 WB 912 arr \(f.string(from: rtArr)) +3m"
-        XCTAssertEqual(title, expected)
+        // rtArr = arr + 180s = now + 72*60 + 180 = now + 4500s → 75 minutes
+        XCTAssertEqual(title, "🟦 WB 912 75m +3m")
     }
 
     func test_titleArrived() {
