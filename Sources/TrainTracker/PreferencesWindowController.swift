@@ -1,6 +1,7 @@
 // Sources/TrainTracker/PreferencesWindowController.swift
 import AppKit
 
+@MainActor
 final class PreferencesWindowController: NSWindowController {
     var onClose: (() -> Void)?
 
@@ -198,9 +199,9 @@ final class PreferencesWindowController: NSWindowController {
         close()
     }
 
-    override func close() {
+    nonisolated override func close() {
         super.close()
-        onClose?()
+        MainActor.assumeIsolated { onClose?() }
     }
 
     // MARK: - UI helpers

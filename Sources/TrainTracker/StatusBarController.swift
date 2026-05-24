@@ -20,9 +20,11 @@ final class StatusBarController {
     // MARK: - Timer
 
     private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.refresh() }
         }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
 
     // MARK: - Refresh
@@ -73,11 +75,15 @@ final class StatusBarController {
 
     // MARK: - Formatting helpers
 
-    nonisolated static func formatHHMM(_ date: Date, delaySecs: Int) -> String {
-        let rt = date.addingTimeInterval(TimeInterval(delaySecs))
+    private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
-        return f.string(from: rt)
+        return f
+    }()
+
+    nonisolated static func formatHHMM(_ date: Date, delaySecs: Int) -> String {
+        let rt = date.addingTimeInterval(TimeInterval(delaySecs))
+        return Self.timeFormatter.string(from: rt)
     }
 
     nonisolated static func formatDelay(_ secs: Int) -> String {
