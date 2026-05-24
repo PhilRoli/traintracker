@@ -56,9 +56,8 @@ final class TrainFetcherTests: XCTestCase {
             plannedArr: iso8601(arrived)
         )
 
-        let options = fetcher.buildOptions(from: [journey])
-        XCTAssertEqual(options.count, 1, "Arrived train must still appear so user can select mid-journey")
-        XCTAssertEqual(options[0].name, "WB 910")
+        let options = fetcher.buildOptions(from: [journey], now: now)
+        XCTAssertEqual(options.count, 0, "Arrived trains must be filtered out")
     }
 
     func test_buildOptions_sortedByDeparture() {
@@ -68,7 +67,7 @@ final class TrainFetcherTests: XCTestCase {
         let j2 = makeJourney(trainName: "WB 912", plannedDep: iso8601(now.addingTimeInterval(-3600)),
                              plannedArr: iso8601(now.addingTimeInterval(600)))
 
-        let options = fetcher.buildOptions(from: [j1, j2])
+        let options = fetcher.buildOptions(from: [j1, j2], now: now)
         XCTAssertEqual(options.count, 2)
         XCTAssertEqual(options[0].name, "WB 912")   // earlier departure first
         XCTAssertEqual(options[1].name, "WB 914")

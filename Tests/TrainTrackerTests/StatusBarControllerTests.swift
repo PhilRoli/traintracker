@@ -25,7 +25,7 @@ final class StatusBarControllerTests: XCTestCase {
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, depDelay: 0, isEnRoute: false)
 
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
-        XCTAssertEqual(title, "WB 912  in 12m")
+        XCTAssertEqual(title, "🟦 WB 912 in 12m")
     }
 
     func test_titleEnRouteOnTime() {
@@ -37,7 +37,7 @@ final class StatusBarControllerTests: XCTestCase {
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
-        let expected = "WB 912 arr \(f.string(from: arr))"
+        let expected = "🟦 WB 912 arr \(f.string(from: arr))"
         XCTAssertEqual(title, expected)
     }
 
@@ -51,7 +51,7 @@ final class StatusBarControllerTests: XCTestCase {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         let rtArr = arr.addingTimeInterval(180)
-        let expected = "WB 912 arr \(f.string(from: rtArr)) +3m"
+        let expected = "🟦 WB 912 arr \(f.string(from: rtArr)) +3m"
         XCTAssertEqual(title, expected)
     }
 
@@ -62,7 +62,24 @@ final class StatusBarControllerTests: XCTestCase {
         let td = makeTrainData(name: "WB 912", dep: dep, arr: arr, arrDelay: 0, isEnRoute: true)
 
         let title = StatusBarController.titleString(for: .tracking(td, []), consecutiveErrors: 0, now: now)
-        XCTAssertEqual(title, "WB 912  Arrived")
+        XCTAssertEqual(title, "🟦 WB 912 Arrived")
+    }
+
+    // MARK: - trainTypeEmoji
+
+    func test_trainTypeEmoji() {
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("RJX 100"), "⚡")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("RJ 200"),  "🚄")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("WB 912"),  "🟦")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("ICE 50"),  "🚆")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("IC 50"),   "🚆")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("EC 50"),   "🚆")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("REX 3"),   "🚂")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("EN 414"),  "🌙")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("NJ 414"),  "🌙")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("S1"),      "🚇")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("Bus 100"), "🚌")
+        XCTAssertEqual(StatusBarController.trainTypeEmoji("R 3456"),  "🚊")
     }
 
     // MARK: - Helpers

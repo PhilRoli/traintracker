@@ -57,9 +57,9 @@ final class TrainFetcher {
         }
     }
 
-    // MARK: - Build train option list (no arrival time filter — fixes problem B)
+    // MARK: - Build train option list
 
-    func buildOptions(from journeys: [APIJourney]) -> [TrainOption] {
+    func buildOptions(from journeys: [APIJourney], now: Date = Date()) -> [TrainOption] {
         var seenNames = Set<String>()
         var options: [TrainOption] = []
 
@@ -70,6 +70,9 @@ final class TrainFetcher {
                   let schArr = Self.parseDate(leg.plannedArrival ?? leg.arrival),
                   seenNames.insert(name).inserted
             else { continue }
+
+            let rtArr = schArr.addingTimeInterval(TimeInterval(leg.arrivalDelay ?? 0))
+            guard rtArr > now else { continue }
 
             options.append(TrainOption(
                 name: name,

@@ -55,22 +55,38 @@ final class StatusBarController {
         case .error:
             return consecutiveErrors >= 2 ? "Train (!)" : "Train"
         case .tracking(let td, _):
+            let emoji = trainTypeEmoji(td.trainName)
             let rtArr = td.scheduledArrival.addingTimeInterval(TimeInterval(td.arrivalDelaySecs))
             let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
 
             if rtArr <= now {
-                return "\(td.trainName) Arrived"
+                return "\(emoji) \(td.trainName) Arrived"
             } else if td.isEnRoute {
                 let timeStr = formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
                 let delay = formatDelay(td.arrivalDelaySecs)
                 return delay.isEmpty
-                    ? "\(td.trainName) arr \(timeStr)"
-                    : "\(td.trainName) arr \(timeStr) \(delay)"
+                    ? "\(emoji) \(td.trainName) arr \(timeStr)"
+                    : "\(emoji) \(td.trainName) arr \(timeStr) \(delay)"
             } else {
                 let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
-                return "\(td.trainName) in \(mins)m"
+                return "\(emoji) \(td.trainName) in \(mins)m"
             }
         }
+    }
+
+    // MARK: - Train type emoji
+
+    nonisolated static func trainTypeEmoji(_ name: String) -> String {
+        let u = name.uppercased()
+        if u.hasPrefix("RJX") { return "⚡" }
+        if u.hasPrefix("RJ")  { return "🚄" }
+        if u.hasPrefix("WB")  { return "🟦" }
+        if u.hasPrefix("ICE") || u.hasPrefix("IC") || u.hasPrefix("EC") { return "🚆" }
+        if u.hasPrefix("REX") { return "🚂" }
+        if u.hasPrefix("EN")  || u.hasPrefix("NJ") { return "🌙" }
+        if u.lowercased().hasPrefix("bus") { return "🚌" }
+        if u.hasPrefix("S"), let second = u.dropFirst().first, second.isNumber { return "🚇" }
+        return "🚊"
     }
 
     // MARK: - Formatting helpers
@@ -133,7 +149,8 @@ final class StatusBarController {
     }
 
     private func addTrackingHeader(_ td: TrainData, to menu: NSMenu) {
-        menu.addItem(disabled("\(td.trainName) \(td.fromName) → \(td.toName)"))
+        let emoji = Self.trainTypeEmoji(td.trainName)
+        menu.addItem(disabled("\(emoji) \(td.trainName) \(td.fromName) → \(td.toName)"))
 
         let dep = Self.formatHHMM(td.scheduledDeparture, delaySecs: td.departureDelaySecs)
         let arr = Self.formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
@@ -152,12 +169,16 @@ final class StatusBarController {
         for sv in stopovers {
             let timeStr = sv.scheduledArrival
                 .map { Self.formatHHMM($0, delaySecs: sv.arrivalDelaySecs) } ?? ""
-            let prefix = sv.isNext ? "> " : "  "
-            let item = NSMenuItem(title: "\(prefix)\(sv.name) \(timeStr)", action: nil, keyEquivalent: "")
+            let icon = sv.passed ? "✓" : (sv.isNext ? "📍" : "○")
+            let delay = Self.formatDelay(sv.arrivalDelaySecs)
+            let label = delay.isEmpty
+                ? "\(icon) \(sv.name) (\(timeStr))"
+                : "\(icon) \(sv.name) (\(timeStr) \(delay))"
+            let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
             item.isEnabled = false
             if sv.passed {
                 item.attributedTitle = NSAttributedString(
-                    string: "\(prefix)\(sv.name) \(timeStr)",
+                    string: label,
                     attributes: [.foregroundColor: NSColor.secondaryLabelColor]
                 )
             }
@@ -167,10 +188,11 @@ final class StatusBarController {
 
     private func addTrainOptions(_ options: [TrainOption], to menu: NSMenu, currentTrain: String?) {
         for opt in options {
+            let emoji = Self.trainTypeEmoji(opt.name)
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
             let arr = Self.formatHHMM(opt.scheduledArrival, delaySecs: opt.arrivalDelaySecs)
             let item = NSMenuItem(
-                title: "\(opt.name) \(dep) → \(arr)",
+                title: "\(emoji) \(opt.name) \(dep) → \(arr)",
                 action: #selector(selectTrain(_:)),
                 keyEquivalent: ""
             )
