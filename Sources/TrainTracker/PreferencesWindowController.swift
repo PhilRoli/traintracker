@@ -16,6 +16,7 @@ final class PreferencesWindowController: NSWindowController {
     private var pendingFrom: Station?
     private var pendingTo: Station?
     private var searchTimer: Timer?
+    private var searchTask: Task<Void, Never>?
     private let client = OeBBClient()
 
     private enum ActiveField { case from, to, none }
@@ -127,14 +128,17 @@ final class PreferencesWindowController: NSWindowController {
             resultsScrollView.isHidden = true
             return
         }
+        searchTask?.cancel()
         searchTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-            Task { [weak self] in await self?.performSearch(query: query) }
+            self?.searchTask = Task { [weak self] in await self?.performSearch(query: query) }
         }
     }
 
     @MainActor
     private func performSearch(query: String) async {
+        guard !Task.isCancelled else { return }
         guard let results = try? await client.searchStations(query: query) else { return }
+        guard !Task.isCancelled else { return }
         searchResults = results.filter { $0.type == "stop" || $0.type == nil }
         resultsTable.reloadData()
         resultsScrollView.isHidden = searchResults.isEmpty
@@ -174,6 +178,7 @@ final class PreferencesWindowController: NSWindowController {
         searchResults = []
         resultsTable.reloadData()
         resultsScrollView.isHidden = true
+        activeField = .none
     }
 
     @objc private func saveAndClose() {
