@@ -43,7 +43,9 @@ final class OeBBClient {
     }
 
     static func refreshJourneyURL(token: String) -> URL? {
-        guard let encoded = token.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        guard let encoded = token.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
         var components = URLComponents(string: "\(baseURL)/journeys/\(encoded)")
         components?.queryItems = [URLQueryItem(name: "stopovers", value: "true")]
         return components?.url

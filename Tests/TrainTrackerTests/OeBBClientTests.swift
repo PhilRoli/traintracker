@@ -35,4 +35,11 @@ final class OeBBClientTests: XCTestCase {
         XCTAssertTrue(url!.absoluteString.contains("/journeys/abc123"))
         XCTAssertTrue(url!.absoluteString.contains("stopovers=true"))
     }
+
+    func test_refreshJourneyURL_encodesSlashInToken() {
+        let url = OeBBClient.refreshJourneyURL(token: "tok/abc==")
+        XCTAssertNotNil(url)
+        XCTAssertFalse(url!.absoluteString.contains("tok/abc"), "Slash in token must be percent-encoded")
+        XCTAssertTrue(url!.absoluteString.contains("tok%2Fabc"), "Slash must be encoded as %2F")
+    }
 }
