@@ -11,12 +11,73 @@ extension UNUserNotificationCenter: NotificationScheduler {}
 @MainActor
 final class NotificationManager {
     private let scheduler: NotificationScheduler
+    private var authRequested = false
+
+    private var trackedTrainKey: String? = nil
+    private var lastDelaySecs: Int = 0
+    private var lastDeparturePlatform: String? = nil
+    private var lastArrivalPlatform: String? = nil
+    private var departureReminderSentFor: String? = nil
 
     init(scheduler: NotificationScheduler = UNUserNotificationCenter.current()) {
         self.scheduler = scheduler
     }
 
     func process(_ data: TrainData, settings: NotificationSettings) {
-        // implementation in subsequent tasks
+        requestAuthIfNeeded()
+
+        let key = "\(data.trainName)|\(Int(data.scheduledDeparture.timeIntervalSince1970))"
+        if key != trackedTrainKey {
+            trackedTrainKey = key
+            lastDelaySecs = 0
+            lastDeparturePlatform = nil
+            lastArrivalPlatform = nil
+            departureReminderSentFor = nil
+        }
+
+        processDepartureReminder(data: data, settings: settings, key: key)
+        processDelayAlert(data: data, settings: settings, key: key)
+        processPlatformChange(data: data, settings: settings, key: key)
+    }
+
+    private func requestAuthIfNeeded() {
+        guard !authRequested else { return }
+        authRequested = true
+        Task { try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) }
+    }
+
+    private func processDepartureReminder(data: TrainData, settings: NotificationSettings, key: String) {
+        guard settings.departureReminderEnabled,
+              !data.isEnRoute,
+              departureReminderSentFor != key
+        else { return }
+
+        let rtDep = data.scheduledDeparture.addingTimeInterval(TimeInterval(data.departureDelaySecs))
+        let secsUntil = rtDep.timeIntervalSinceNow
+        guard secsUntil > 0, secsUntil <= Double(settings.departureReminderMinutes * 60) else { return }
+
+        let content = UNMutableNotificationContent()
+        let minsLeft = max(1, Int(secsUntil / 60))
+        content.title = "\(data.trainName) departs in \(minsLeft)m"
+        content.body = data.departurePlatform
+            .map { "Platform \($0) at \(data.fromName)" }
+            ?? "From \(data.fromName)"
+
+        post(identifier: "departure-\(key)", content: content)
+        departureReminderSentFor = key
+    }
+
+    private func processDelayAlert(data: TrainData, settings: NotificationSettings, key: String) {
+        // stub — implemented in Task 4
+    }
+
+    private func processPlatformChange(data: TrainData, settings: NotificationSettings, key: String) {
+        // stub — implemented in Task 5
+    }
+
+    private func post(identifier: String, content: UNMutableNotificationContent) {
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        scheduler.add(request, withCompletionHandler: nil)
     }
 }

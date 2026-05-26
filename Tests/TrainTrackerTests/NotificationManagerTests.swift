@@ -62,4 +62,98 @@ final class NotificationManagerTests: XCTestCase {
             isEnRoute: isEnRoute
         )
     }
+
+    // MARK: - Departure reminder
+
+    func test_departureReminder_firesWhenWithinWindow() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.departureReminderMinutes = 10
+
+        // Train departs in 8 minutes (within 10m window)
+        let data = makeTrainData(
+            scheduledDeparture: Date().addingTimeInterval(8 * 60),
+            isEnRoute: false
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 1)
+        XCTAssertTrue(spy.posted[0].identifier.hasPrefix("departure-"))
+        XCTAssertTrue(spy.posted[0].title.contains("WB 912"))
+        XCTAssertTrue(spy.posted[0].title.contains("departs"))
+    }
+
+    func test_departureReminder_doesNotFireOutsideWindow() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.departureReminderMinutes = 10
+
+        // Train departs in 15 minutes (outside 10m window)
+        let data = makeTrainData(
+            scheduledDeparture: Date().addingTimeInterval(15 * 60),
+            isEnRoute: false
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    func test_departureReminder_doesNotFireWhenEnRoute() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+
+        let data = makeTrainData(
+            scheduledDeparture: Date().addingTimeInterval(5 * 60),
+            isEnRoute: true
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    func test_departureReminder_doesNotFireTwiceForSameTrain() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+        let departure = Date().addingTimeInterval(5 * 60)
+        let data = makeTrainData(scheduledDeparture: departure, isEnRoute: false)
+
+        manager.process(data, settings: settings)
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 1)
+    }
+
+    func test_departureReminder_doesNotFireWhenDisabled() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.departureReminderEnabled = false
+
+        let data = makeTrainData(
+            scheduledDeparture: Date().addingTimeInterval(5 * 60),
+            isEnRoute: false
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    func test_departureReminder_includesPlatformInBodyWhenAvailable() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+
+        let data = makeTrainData(
+            scheduledDeparture: Date().addingTimeInterval(5 * 60),
+            departurePlatform: "3",
+            isEnRoute: false
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 1)
+        XCTAssertTrue(spy.posted[0].body.contains("3"))
+    }
 }
