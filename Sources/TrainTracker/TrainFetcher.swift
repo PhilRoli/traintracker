@@ -46,7 +46,7 @@ final class TrainFetcher {
         guard let (td, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
             return .error("\(trainNumber) not found — use Switch Train to reselect")
         }
-        cachedRefreshToken = token
+        if let t = token { cachedRefreshToken = t }
         return .tracking(td, options)
     }
 
