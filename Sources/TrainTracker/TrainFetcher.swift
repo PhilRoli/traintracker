@@ -2,10 +2,10 @@
 import Foundation
 
 final class TrainFetcher {
-    private let client: OeBBClient
+    private let client: any OeBBClientProtocol
     private static let offsets: [TimeInterval] = [-6 * 3600, -4 * 3600, -2 * 3600, -1800, 0]
 
-    init(client: OeBBClient = OeBBClient()) {
+    init(client: any OeBBClientProtocol = OeBBClient()) {
         self.client = client
     }
 

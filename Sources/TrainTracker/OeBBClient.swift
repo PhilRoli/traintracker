@@ -1,12 +1,18 @@
 // Sources/TrainTracker/OeBBClient.swift
 import Foundation
 
+protocol OeBBClientProtocol {
+    func searchStations(query: String) async throws -> [APILocation]
+    func fetchJourneys(fromId: String, toId: String, departure: Date) async throws -> [APIJourney]
+    func refreshJourney(token: String) async throws -> APIJourney
+}
+
 enum OeBBError: Error {
     case invalidURL
     case httpError(Int)
 }
 
-final class OeBBClient {
+final class OeBBClient: OeBBClientProtocol {
     static let baseURL = "https://oebb.macistry.com/api"
     private let session: URLSession
 
