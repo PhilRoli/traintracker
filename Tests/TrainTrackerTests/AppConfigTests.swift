@@ -51,4 +51,40 @@ final class AppConfigTests: XCTestCase {
         XCTAssertNil(loaded.trainNumber)
         XCTAssertEqual(loaded.fromStation?.id, "8103000")
     }
+
+    func test_notificationSettings_defaultValues() {
+        let settings = NotificationSettings()
+        XCTAssertTrue(settings.departureReminderEnabled)
+        XCTAssertEqual(settings.departureReminderMinutes, 10)
+        XCTAssertTrue(settings.delayAlertEnabled)
+        XCTAssertEqual(settings.delayAlertThresholdMinutes, 10)
+        XCTAssertTrue(settings.platformChangeEnabled)
+    }
+
+    func test_notificationSettings_roundtrip() throws {
+        var settings = NotificationSettings()
+        settings.departureReminderMinutes = 7
+        settings.delayAlertThresholdMinutes = 15
+        settings.platformChangeEnabled = false
+
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(NotificationSettings.self, from: data)
+
+        XCTAssertEqual(decoded.departureReminderMinutes, 7)
+        XCTAssertEqual(decoded.delayAlertThresholdMinutes, 15)
+        XCTAssertFalse(decoded.platformChangeEnabled)
+    }
+
+    func test_appConfig_notificationsDefaultsOnMissingKey() throws {
+        // Simulate a stored config that predates NotificationSettings (no "notifications" key)
+        let legacyJSON = """
+        {"fromStation":{"name":"Linz/Donau Hbf","id":"8100013"},
+         "toStation":{"name":"Salzburg Hbf","id":"8100002"},
+         "trainNumber":"WB 912","savedRoutes":[]}
+        """.data(using: .utf8)!
+
+        let config = try JSONDecoder().decode(AppConfig.self, from: legacyJSON)
+        XCTAssertTrue(config.notifications.departureReminderEnabled)
+        XCTAssertEqual(config.notifications.departureReminderMinutes, 10)
+    }
 }

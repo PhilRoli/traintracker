@@ -13,13 +13,48 @@ struct SavedRoute: Codable, Equatable {
     var displayName: String { "\(from.name) → \(to.name)" }
 }
 
+struct NotificationSettings: Codable {
+    var departureReminderEnabled: Bool  = true
+    var departureReminderMinutes: Int   = 10
+    var delayAlertEnabled: Bool         = true
+    var delayAlertThresholdMinutes: Int = 10
+    var platformChangeEnabled: Bool     = true
+}
+
 struct AppConfig: Codable {
     var fromStation: Station?
     var toStation: Station?
     var trainNumber: String?
     var savedRoutes: [SavedRoute]
+    var notifications: NotificationSettings = NotificationSettings()
 
     init() { savedRoutes = [] }
+
+    enum CodingKeys: String, CodingKey {
+        case fromStation
+        case toStation
+        case trainNumber
+        case savedRoutes
+        case notifications
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fromStation = try container.decodeIfPresent(Station.self, forKey: .fromStation)
+        toStation = try container.decodeIfPresent(Station.self, forKey: .toStation)
+        trainNumber = try container.decodeIfPresent(String.self, forKey: .trainNumber)
+        savedRoutes = try container.decode([SavedRoute].self, forKey: .savedRoutes)
+        notifications = try container.decodeIfPresent(NotificationSettings.self, forKey: .notifications) ?? NotificationSettings()
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(fromStation, forKey: .fromStation)
+        try container.encodeIfPresent(toStation, forKey: .toStation)
+        try container.encodeIfPresent(trainNumber, forKey: .trainNumber)
+        try container.encode(savedRoutes, forKey: .savedRoutes)
+        try container.encode(notifications, forKey: .notifications)
+    }
 }
 
 final class AppConfigStore {
