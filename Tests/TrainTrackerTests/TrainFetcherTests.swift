@@ -45,19 +45,28 @@ final class TrainFetcherTests: XCTestCase {
 
     // MARK: - buildOptions (no arrival time filter)
 
-    func test_buildOptions_includesArrivedTrains() {
-        // Train that arrived 2 hours ago — must still appear in options
+    func test_buildOptions_filtersTrainArrivedLongAgo() {
         let now = Date()
-        let departed = now.addingTimeInterval(-4 * 3600)
-        let arrived = now.addingTimeInterval(-2 * 3600)
         let journey = makeJourney(
             trainName: "WB 910",
-            plannedDep: iso8601(departed),
-            plannedArr: iso8601(arrived)
+            plannedDep: iso8601(now.addingTimeInterval(-4 * 3600)),
+            plannedArr: iso8601(now.addingTimeInterval(-2 * 3600))
         )
-
         let options = fetcher.buildOptions(from: [journey], now: now)
-        XCTAssertEqual(options.count, 0, "Arrived trains must be filtered out")
+        XCTAssertEqual(options.count, 0, "Train arrived 2 hours ago should be filtered out")
+    }
+
+    func test_buildOptions_keepsDelayedTrainWithNoRealTimeData() {
+        // Scheduled arrival passed 20 min ago, but no arrivalDelay from API (e.g. Westbahn)
+        // — train is still en route (delayed); grace period keeps it visible
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "WB 931",
+            plannedDep: iso8601(now.addingTimeInterval(-2 * 3600)),
+            plannedArr: iso8601(now.addingTimeInterval(-20 * 60))
+        )
+        let options = fetcher.buildOptions(from: [journey], now: now)
+        XCTAssertEqual(options.count, 1, "Delayed train past scheduled arrival should still appear")
     }
 
     func test_buildOptions_sortedByDeparture() {

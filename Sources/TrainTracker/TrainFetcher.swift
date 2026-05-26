@@ -3,7 +3,7 @@ import Foundation
 
 final class TrainFetcher {
     private let client: OeBBClient
-    private static let offsets: [TimeInterval] = [-6 * 3600, -4 * 3600, -2 * 3600, 0]
+    private static let offsets: [TimeInterval] = [-6 * 3600, -4 * 3600, -2 * 3600, -1800, 0]
 
     init(client: OeBBClient = OeBBClient()) {
         self.client = client
@@ -72,7 +72,8 @@ final class TrainFetcher {
             else { continue }
 
             let rtArr = schArr.addingTimeInterval(TimeInterval(leg.arrivalDelay ?? 0))
-            guard rtArr > now else { continue }
+            // Grace period handles trains delayed beyond scheduled arrival with no real-time data
+            guard rtArr > now.addingTimeInterval(-30 * 60) else { continue }
 
             options.append(TrainOption(
                 name: name,
