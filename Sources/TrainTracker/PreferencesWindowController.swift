@@ -18,6 +18,7 @@ final class PreferencesWindowController: NSWindowController {
     private var pendingTo: Station?
     private var searchTimer: Timer?
     private var searchTask: Task<Void, Never>?
+    private var deleteRouteButton: NSButton!
     private let client = OeBBClient()
 
     private var departureReminderCheckbox: NSButton!
@@ -99,19 +100,25 @@ final class PreferencesWindowController: NSWindowController {
         routesLabel.frame = NSRect(x: 16, y: 248, width: 120, height: 20)
         cv.addSubview(routesLabel)
 
-        // Saved routes table
+        // "–" delete button aligned with the label
+        let deleteBtn = NSButton(title: "–", target: self, action: #selector(deleteSelectedRoute))
+        deleteBtn.bezelStyle = .smallSquare
+        deleteBtn.frame = NSRect(x: 352, y: 244, width: 32, height: 24)
+        deleteBtn.isEnabled = false
+        cv.addSubview(deleteBtn)
+        deleteRouteButton = deleteBtn
+
+        // Saved routes table (single column, full-width)
         let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 164, width: 368, height: 76))
         savedScrollView.hasVerticalScroller = true
         savedScrollView.borderType = .bezelBorder
-        savedRoutesTable = NSTableView()
+        let deletable = DeletableTableView()
+        deletable.onDelete = { [weak self] in self?.deleteSelectedRoute() }
+        savedRoutesTable = deletable
         let nameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("route"))
         nameCol.title = "Route"
-        nameCol.width = 260
-        let loadCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("load"))
-        loadCol.title = ""
-        loadCol.width = 60
+        nameCol.width = 350
         savedRoutesTable.addTableColumn(nameCol)
-        savedRoutesTable.addTableColumn(loadCol)
         savedRoutesTable.headerView = nil
         savedRoutesTable.dataSource = self
         savedRoutesTable.delegate = self
@@ -242,6 +249,14 @@ final class PreferencesWindowController: NSWindowController {
         activeField = .none
     }
 
+    @objc private func deleteSelectedRoute() {
+        let row = savedRoutesTable.selectedRow
+        guard row >= 0, row < savedRoutes.count else { return }
+        savedRoutes.remove(at: row)
+        savedRoutesTable.reloadData()
+        deleteRouteButton.isEnabled = savedRoutesTable.selectedRow >= 0
+    }
+
     @objc private func notifCheckboxChanged(_ sender: NSButton) {
         departureReminderField.isEnabled = departureReminderCheckbox.state == .on
         delayAlertField.isEnabled = delayAlertCheckbox.state == .on
@@ -249,16 +264,17 @@ final class PreferencesWindowController: NSWindowController {
 
     @objc private func saveAndClose() {
         var config = AppConfigStore.shared.load()
-        // Check for station change BEFORE overwriting the stored values
         let stationsChanged = config.fromStation != pendingFrom || config.toStation != pendingTo
         config.fromStation = pendingFrom
         config.toStation = pendingTo
+        var routes = savedRoutes
         if let f = pendingFrom, let t = pendingTo {
             let route = SavedRoute(from: f, to: t)
-            if !config.savedRoutes.contains(route) {
-                config.savedRoutes.append(route)
+            if !routes.contains(route) {
+                routes.append(route)
             }
         }
+        config.savedRoutes = routes
         if stationsChanged { config.trainNumber = nil }
         config.notifications = NotificationSettings(
             departureReminderEnabled: departureReminderCheckbox.state == .on,
@@ -328,16 +344,34 @@ extension PreferencesWindowController: NSTableViewDataSource, NSTableViewDelegat
         tableView === resultsTable ? searchResults.count : savedRoutes.count
     }
 
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        guard let table = notification.object as? NSTableView, table === savedRoutesTable else { return }
+        deleteRouteButton.isEnabled = savedRoutesTable.selectedRow >= 0
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let cell = NSTextField(labelWithString: "")
         cell.font = NSFont.systemFont(ofSize: 13)
         if tableView === resultsTable {
             cell.stringValue = searchResults[row].name
         } else {
-            let id = tableColumn?.identifier.rawValue
-            cell.stringValue = id == "route" ? savedRoutes[row].displayName : "Load"
-            if id == "load" { cell.textColor = .linkColor }
+            cell.stringValue = savedRoutes[row].displayName
         }
         return cell
+    }
+}
+
+// MARK: - DeletableTableView
+
+private class DeletableTableView: NSTableView {
+    var onDelete: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        // keyCode 51 = Delete (backspace), 117 = Forward Delete
+        if event.keyCode == 51 || event.keyCode == 117 {
+            onDelete?()
+        } else {
+            super.keyDown(with: event)
+        }
     }
 }
