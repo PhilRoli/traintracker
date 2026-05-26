@@ -28,4 +28,11 @@ final class OeBBClientTests: XCTestCase {
         XCTAssertTrue(url!.absoluteString.contains("stopovers=true"))
         XCTAssertTrue(url!.absoluteString.contains("results=12"))
     }
+
+    func test_refreshJourneyURL() {
+        let url = OeBBClient.refreshJourneyURL(token: "abc123")
+        XCTAssertNotNil(url)
+        XCTAssertTrue(url!.absoluteString.contains("/journeys/abc123"))
+        XCTAssertTrue(url!.absoluteString.contains("stopovers=true"))
+    }
 }

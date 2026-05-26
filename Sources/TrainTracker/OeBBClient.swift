@@ -42,6 +42,13 @@ final class OeBBClient {
         return components?.url
     }
 
+    static func refreshJourneyURL(token: String) -> URL? {
+        guard let encoded = token.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
+        var components = URLComponents(string: "\(baseURL)/journeys/\(encoded)")
+        components?.queryItems = [URLQueryItem(name: "stopovers", value: "true")]
+        return components?.url
+    }
+
     // MARK: - Network calls
 
     func searchStations(query: String) async throws -> [APILocation] {
@@ -63,5 +70,14 @@ final class OeBBClient {
         }
         let resp = try JSONDecoder().decode(APIJourneysResponse.self, from: data)
         return resp.journeys
+    }
+
+    func refreshJourney(token: String) async throws -> APIJourney {
+        guard let url = Self.refreshJourneyURL(token: token) else { throw OeBBError.invalidURL }
+        let (data, response) = try await session.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw OeBBError.httpError(http.statusCode)
+        }
+        return try JSONDecoder().decode(APIJourneyResponse.self, from: data).journey
     }
 }

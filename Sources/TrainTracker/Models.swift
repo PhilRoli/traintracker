@@ -46,10 +46,15 @@ struct APILeg: Codable {
 
 struct APIJourney: Codable {
     let legs: [APILeg]
+    let refreshToken: String?
 }
 
 struct APIJourneysResponse: Codable {
     let journeys: [APIJourney]
+}
+
+struct APIJourneyResponse: Codable {
+    let journey: APIJourney
 }
 
 // MARK: - Internal Display Types

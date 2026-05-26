@@ -180,7 +180,7 @@ final class TrainFetcherTests: XCTestCase {
             arrivalPlatform: nil,
             stopovers: nil
         )
-        return APIJourney(legs: [leg])
+        return APIJourney(legs: [leg], refreshToken: nil)
     }
 
     private func makeStopover(name: String, arr: String? = nil, dep: String? = nil) -> APIStopover {
