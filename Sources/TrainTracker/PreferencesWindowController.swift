@@ -20,11 +20,18 @@ final class PreferencesWindowController: NSWindowController {
     private var searchTask: Task<Void, Never>?
     private let client = OeBBClient()
 
+    private var departureReminderCheckbox: NSButton!
+    private var departureReminderField: NSTextField!
+    private var delayAlertCheckbox: NSButton!
+    private var delayAlertField: NSTextField!
+    private var platformChangeCheckbox: NSButton!
+    private var pendingNotifications: NotificationSettings = NotificationSettings()
+
     private enum ActiveField { case from, to, none }
 
     convenience init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 440),
             styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -42,6 +49,7 @@ final class PreferencesWindowController: NSWindowController {
         pendingFrom = config.fromStation
         pendingTo = config.toStation
         savedRoutes = config.savedRoutes
+        pendingNotifications = config.notifications
     }
 
     private func setupUI() {
@@ -49,28 +57,28 @@ final class PreferencesWindowController: NSWindowController {
 
         // From row
         let fromLabel = makeLabel("From:")
-        fromLabel.frame = NSRect(x: 16, y: 272, width: 50, height: 20)
+        fromLabel.frame = NSRect(x: 16, y: 392, width: 50, height: 20)
         cv.addSubview(fromLabel)
 
         fromField = makeTextField(placeholder: "Search for station…")
-        fromField.frame = NSRect(x: 70, y: 268, width: 314, height: 24)
+        fromField.frame = NSRect(x: 70, y: 388, width: 314, height: 24)
         fromField.stringValue = pendingFrom?.name ?? ""
         fromField.delegate = self
         cv.addSubview(fromField)
 
         // To row
         let toLabel = makeLabel("To:")
-        toLabel.frame = NSRect(x: 16, y: 240, width: 50, height: 20)
+        toLabel.frame = NSRect(x: 16, y: 360, width: 50, height: 20)
         cv.addSubview(toLabel)
 
         toField = makeTextField(placeholder: "Search for station…")
-        toField.frame = NSRect(x: 70, y: 236, width: 314, height: 24)
+        toField.frame = NSRect(x: 70, y: 356, width: 314, height: 24)
         toField.stringValue = pendingTo?.name ?? ""
         toField.delegate = self
         cv.addSubview(toField)
 
         // Search results table (hidden until there are results)
-        resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 152, width: 314, height: 76))
+        resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 272, width: 314, height: 76))
         resultsScrollView.hasVerticalScroller = true
         resultsScrollView.borderType = .bezelBorder
         resultsTable = NSTableView()
@@ -88,11 +96,11 @@ final class PreferencesWindowController: NSWindowController {
 
         // Saved routes label
         let routesLabel = makeLabel("Saved routes:")
-        routesLabel.frame = NSRect(x: 16, y: 128, width: 120, height: 20)
+        routesLabel.frame = NSRect(x: 16, y: 248, width: 120, height: 20)
         cv.addSubview(routesLabel)
 
         // Saved routes table
-        let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 44, width: 368, height: 76))
+        let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 164, width: 368, height: 76))
         savedScrollView.hasVerticalScroller = true
         savedScrollView.borderType = .bezelBorder
         savedRoutesTable = NSTableView()
@@ -117,6 +125,56 @@ final class PreferencesWindowController: NSWindowController {
         saveBtn.bezelStyle = .rounded
         saveBtn.frame = NSRect(x: 284, y: 8, width: 100, height: 28)
         cv.addSubview(saveBtn)
+
+        // Notifications section separator
+        let notifSeparator = NSBox()
+        notifSeparator.boxType = .separator
+        notifSeparator.frame = NSRect(x: 16, y: 156, width: 368, height: 1)
+        cv.addSubview(notifSeparator)
+
+        // Section label
+        let notifLabel = makeLabel("Notifications")
+        notifLabel.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        notifLabel.frame = NSRect(x: 16, y: 136, width: 200, height: 18)
+        cv.addSubview(notifLabel)
+
+        // Departure reminder row
+        departureReminderCheckbox = NSButton(checkboxWithTitle: "Departure reminder", target: self, action: #selector(notifCheckboxChanged(_:)))
+        departureReminderCheckbox.frame = NSRect(x: 16, y: 110, width: 170, height: 20)
+        departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
+        cv.addSubview(departureReminderCheckbox)
+
+        departureReminderField = makeNumberField()
+        departureReminderField.frame = NSRect(x: 192, y: 110, width: 40, height: 20)
+        departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
+        departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
+        cv.addSubview(departureReminderField)
+
+        let depMinLabel = makeLabel("minutes before")
+        depMinLabel.frame = NSRect(x: 238, y: 110, width: 120, height: 20)
+        cv.addSubview(depMinLabel)
+
+        // Delay alert row
+        delayAlertCheckbox = NSButton(checkboxWithTitle: "Delay alert when", target: self, action: #selector(notifCheckboxChanged(_:)))
+        delayAlertCheckbox.frame = NSRect(x: 16, y: 82, width: 160, height: 20)
+        delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
+        cv.addSubview(delayAlertCheckbox)
+
+        delayAlertField = makeNumberField()
+        delayAlertField.frame = NSRect(x: 182, y: 82, width: 40, height: 20)
+        delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
+        delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
+        cv.addSubview(delayAlertField)
+
+        let delayMinLabel = makeLabel("+ minutes late")
+        delayMinLabel.frame = NSRect(x: 228, y: 82, width: 130, height: 20)
+        cv.addSubview(delayMinLabel)
+
+        // Platform change row
+        platformChangeCheckbox = NSButton(checkboxWithTitle: "Platform change alert", target: self, action: #selector(notifCheckboxChanged(_:)))
+        platformChangeCheckbox.frame = NSRect(x: 16, y: 54, width: 220, height: 20)
+        platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
+        cv.addSubview(platformChangeCheckbox)
     }
 
     // MARK: - Debounced search
@@ -184,6 +242,11 @@ final class PreferencesWindowController: NSWindowController {
         activeField = .none
     }
 
+    @objc private func notifCheckboxChanged(_ sender: NSButton) {
+        departureReminderField.isEnabled = departureReminderCheckbox.state == .on
+        delayAlertField.isEnabled = delayAlertCheckbox.state == .on
+    }
+
     @objc private func saveAndClose() {
         var config = AppConfigStore.shared.load()
         // Check for station change BEFORE overwriting the stored values
@@ -197,6 +260,13 @@ final class PreferencesWindowController: NSWindowController {
             }
         }
         if stationsChanged { config.trainNumber = nil }
+        config.notifications = NotificationSettings(
+            departureReminderEnabled: departureReminderCheckbox.state == .on,
+            departureReminderMinutes: max(1, departureReminderField.integerValue),
+            delayAlertEnabled: delayAlertCheckbox.state == .on,
+            delayAlertThresholdMinutes: max(1, delayAlertField.integerValue),
+            platformChangeEnabled: platformChangeCheckbox.state == .on
+        )
         AppConfigStore.shared.save(config)
         close()
     }
@@ -219,6 +289,19 @@ final class PreferencesWindowController: NSWindowController {
         f.placeholderString = placeholder
         f.font = NSFont.systemFont(ofSize: 13)
         f.bezelStyle = .roundedBezel
+        return f
+    }
+
+    private func makeNumberField() -> NSTextField {
+        let f = NSTextField()
+        f.font = NSFont.systemFont(ofSize: 13)
+        f.bezelStyle = .roundedBezel
+        f.alignment = .center
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .none
+        formatter.minimum = 1
+        formatter.maximum = 120
+        f.formatter = formatter
         return f
     }
 }
