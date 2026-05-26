@@ -9,6 +9,7 @@ final class StatusBarController {
     private var consecutiveErrors = 0
     private var lastGoodStatus: TrainStatus = .noConfig   // shown during transient errors
     private var prefsController: PreferencesWindowController?
+    private let notificationManager = NotificationManager()
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -44,6 +45,10 @@ final class StatusBarController {
         let displayStatus: TrainStatus = consecutiveErrors >= 2 ? status : lastGoodStatus
         statusItem.button?.title = Self.titleString(for: displayStatus, consecutiveErrors: consecutiveErrors)
         statusItem.menu = buildMenu(for: displayStatus)
+
+        if case .tracking(let td, _) = displayStatus {
+            notificationManager.process(td, settings: config.notifications)
+        }
     }
 
     // MARK: - Title string (static for testability)
