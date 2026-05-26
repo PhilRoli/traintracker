@@ -81,7 +81,24 @@ final class NotificationManager {
     }
 
     private func processPlatformChange(data: TrainData, settings: NotificationSettings, key: String) {
-        // stub — implemented in Task 5
+        defer {
+            lastDeparturePlatform = data.departurePlatform
+            lastArrivalPlatform = data.arrivalPlatform
+        }
+        guard settings.platformChangeEnabled else { return }
+
+        if let prev = lastDeparturePlatform, let curr = data.departurePlatform, prev != curr {
+            let content = UNMutableNotificationContent()
+            content.title = "\(data.trainName): departure platform changed"
+            content.body = "Now departing from platform \(curr)"
+            post(identifier: "platform-dep-\(key)", content: content)
+        }
+        if let prev = lastArrivalPlatform, let curr = data.arrivalPlatform, prev != curr {
+            let content = UNMutableNotificationContent()
+            content.title = "\(data.trainName): arrival platform changed"
+            content.body = "Now arriving at platform \(curr)"
+            post(identifier: "platform-arr-\(key)", content: content)
+        }
     }
 
     private func post(identifier: String, content: UNMutableNotificationContent) {

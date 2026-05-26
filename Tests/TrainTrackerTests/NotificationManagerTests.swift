@@ -213,4 +213,101 @@ final class NotificationManagerTests: XCTestCase {
 
         XCTAssertEqual(spy.posted.count, 0)
     }
+
+    // MARK: - Platform change
+
+    func test_platformChange_firesWhenDeparturePlatformChanges() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        // First call: platform 3
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+        XCTAssertEqual(spy.posted.count, 0, "No change on first observation")
+
+        // Second call: platform changed to 4
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "4", isEnRoute: true), settings: settings)
+        XCTAssertEqual(spy.posted.count, 1)
+        XCTAssertTrue(spy.posted[0].identifier.hasPrefix("platform-dep-"))
+        XCTAssertTrue(spy.posted[0].title.contains("departure platform"))
+        XCTAssertTrue(spy.posted[0].body.contains("4"))
+    }
+
+    func test_platformChange_doesNotFireOnFirstObservation() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+
+        manager.process(makeTrainData(departurePlatform: "3", isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    func test_platformChange_doesNotFireWhenSame() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    func test_platformChange_doesNotFireWhenDisabled() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.platformChangeEnabled = false
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       departurePlatform: "5", isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
+
+    // MARK: - State reset
+
+    func test_stateReset_departureReminderCanFireAgainForNewTrain() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+
+        // First train: reminder fires
+        let dep1 = Date().addingTimeInterval(5 * 60)
+        manager.process(makeTrainData(trainName: "WB 912", scheduledDeparture: dep1,
+                                       isEnRoute: false), settings: settings)
+        XCTAssertEqual(spy.posted.count, 1)
+
+        // Switch to a different train: reminder should fire again
+        let dep2 = Date().addingTimeInterval(7 * 60)
+        manager.process(makeTrainData(trainName: "WB 914", scheduledDeparture: dep2,
+                                       isEnRoute: false), settings: settings)
+        XCTAssertEqual(spy.posted.count, 2)
+    }
+
+    func test_stateReset_platformChangeDoesNotFireForNewTrain() {
+        let (manager, spy) = makeManager()
+        let settings = NotificationSettings()
+        let dep1 = Date().addingTimeInterval(-3600)
+        let arr1 = Date().addingTimeInterval(3600)
+        let dep2 = Date().addingTimeInterval(-1800)
+        let arr2 = Date().addingTimeInterval(5400)
+
+        // First train: observe platform 3
+        manager.process(makeTrainData(trainName: "WB 912", scheduledDeparture: dep1, scheduledArrival: arr1,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+        // Switch train: different train also has platform 3 — no change notification expected
+        manager.process(makeTrainData(trainName: "WB 914", scheduledDeparture: dep2, scheduledArrival: arr2,
+                                       departurePlatform: "3", isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
 }
