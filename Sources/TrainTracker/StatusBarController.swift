@@ -116,7 +116,20 @@ final class StatusBarController {
 
     // MARK: - Menu building
 
+    private func makeRouteSubmenu(config: AppConfig) -> NSMenuItem {
+        let item = NSMenuItem(title: "Switch Route…", action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        var currentRoute: SavedRoute? = nil
+        if let from = config.fromStation, let to = config.toStation {
+            currentRoute = config.savedRoutes.first { $0.from == from && $0.to == to }
+        }
+        addRouteOptions(config.savedRoutes, to: sub, currentRoute: currentRoute)
+        item.submenu = sub
+        return item
+    }
+
     private func buildMenu(for status: TrainStatus) -> NSMenu {
+        let config = AppConfigStore.shared.load()
         let menu = NSMenu()
 
         switch status {
@@ -127,6 +140,8 @@ final class StatusBarController {
             menu.addItem(disabled("Pick your train:"))
             menu.addItem(.separator())
             addTrainOptions(options, to: menu, currentTrain: nil)
+            menu.addItem(.separator())
+            menu.addItem(makeRouteSubmenu(config: config))
 
         case .tracking(let td, let options):
             addTrackingHeader(td, to: menu)
@@ -140,6 +155,7 @@ final class StatusBarController {
             addTrainOptions(options, to: switchSub, currentTrain: td.trainName)
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
+            menu.addItem(makeRouteSubmenu(config: config))
 
         case .error(let msg):
             menu.addItem(disabled(msg))
@@ -192,6 +208,23 @@ final class StatusBarController {
         }
     }
 
+    private func addRouteOptions(_ routes: [SavedRoute], to menu: NSMenu, currentRoute: SavedRoute?) {
+        for route in routes {
+            let item = NSMenuItem(
+                title: route.displayName,
+                action: #selector(selectRoute(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = route
+            item.target = self
+            if route == currentRoute { item.state = .on }
+            menu.addItem(item)
+        }
+        if routes.isEmpty {
+            menu.addItem(disabled("No saved routes"))
+        }
+    }
+
     private func addTrainOptions(_ options: [TrainOption], to menu: NSMenu, currentTrain: String?) {
         for opt in options {
             let emoji = Self.trainTypeEmoji(opt.name)
@@ -232,6 +265,16 @@ final class StatusBarController {
         guard let name = sender.representedObject as? String else { return }
         var config = AppConfigStore.shared.load()
         config.trainNumber = name
+        AppConfigStore.shared.save(config)
+        Task { await refresh() }
+    }
+
+    @objc private func selectRoute(_ sender: NSMenuItem) {
+        guard let route = sender.representedObject as? SavedRoute else { return }
+        var config = AppConfigStore.shared.load()
+        config.fromStation = route.from
+        config.toStation = route.to
+        config.trainNumber = nil
         AppConfigStore.shared.save(config)
         Task { await refresh() }
     }
