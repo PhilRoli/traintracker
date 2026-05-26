@@ -4,6 +4,7 @@ import Foundation
 
 protocol NotificationScheduler {
     func add(_ request: UNNotificationRequest, withCompletionHandler completionHandler: (@Sendable (Error?) -> Void)?)
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
 }
 
 extension UNUserNotificationCenter: NotificationScheduler {}
@@ -43,7 +44,7 @@ final class NotificationManager {
     private func requestAuthIfNeeded() {
         guard !authRequested else { return }
         authRequested = true
-        Task { try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) }
+        Task { [scheduler] in try? await scheduler.requestAuthorization(options: [.alert, .sound]) }
     }
 
     private func processDepartureReminder(data: TrainData, settings: NotificationSettings, key: String) {

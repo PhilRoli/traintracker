@@ -21,6 +21,8 @@ final class NotificationSpy: NotificationScheduler {
         ))
         completionHandler?(nil)
     }
+
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool { true }
 }
 
 // MARK: - Tests

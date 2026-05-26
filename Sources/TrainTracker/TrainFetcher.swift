@@ -5,6 +5,11 @@ final class TrainFetcher {
     private let client: any OeBBClientProtocol
     private static let offsets: [TimeInterval] = [-6 * 3600, -4 * 3600, -2 * 3600, -1800, 0]
 
+    // Refresh-token cache — all access is sequential via StatusBarController's timer
+    private var cachedRefreshToken: String?
+    private var cachedConfigKey: String?
+    private var cachedOptions: [TrainOption] = []
+
     init(client: any OeBBClientProtocol = OeBBClient()) {
         self.client = client
     }
@@ -13,19 +18,65 @@ final class TrainFetcher {
 
     func fetch(config: AppConfig) async -> TrainStatus {
         guard let from = config.fromStation, let to = config.toStation else {
+            invalidateCache()
             return .noConfig
         }
+
         let now = Date()
+        let configKey = "\(from.id)|\(to.id)|\(config.trainNumber ?? "")"
+        if configKey != cachedConfigKey {
+            invalidateCache()
+            cachedConfigKey = configKey
+        }
+
+        if let token = cachedRefreshToken, let trainNumber = config.trainNumber {
+            if let td = await tryRefresh(token: token, trainNumber: trainNumber, now: now) {
+                return .tracking(td, cachedOptions)
+            }
+            // tryRefresh cleared the token on failure; fall through to full fetch
+        }
+
         let journeys = await fetchAllJourneys(fromId: from.id, toId: to.id, now: now)
         let options = buildOptions(from: journeys)
+        cachedOptions = options
 
         guard let trainNumber = config.trainNumber else {
             return .pickTrain(options)
         }
-        guard let match = findTrain(named: trainNumber, in: journeys, now: now) else {
+        guard let (td, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
             return .error("\(trainNumber) not found — use Switch Train to reselect")
         }
-        return .tracking(match, options)
+        cachedRefreshToken = token
+        return .tracking(td, options)
+    }
+
+    private func tryRefresh(token: String, trainNumber: String, now: Date) async -> TrainData? {
+        guard let journey = try? await client.refreshJourney(token: token) else {
+            cachedRefreshToken = nil
+            return nil
+        }
+        guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
+              let td = buildTrainData(leg: leg, now: now)
+        else {
+            cachedRefreshToken = nil
+            return nil
+        }
+        return td
+    }
+
+    private func findTrainWithToken(named trainNumber: String, in journeys: [APIJourney], now: Date) -> (TrainData, String?)? {
+        for journey in journeys {
+            guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
+                  let td = buildTrainData(leg: leg, now: now) else { continue }
+            return (td, journey.refreshToken)
+        }
+        return nil
+    }
+
+    private func invalidateCache() {
+        cachedRefreshToken = nil
+        cachedConfigKey = nil
+        cachedOptions = []
     }
 
     // MARK: - Concurrent journey fetch
@@ -89,11 +140,7 @@ final class TrainFetcher {
     // MARK: - Find specific train by exact name
 
     func findTrain(named trainNumber: String, in journeys: [APIJourney], now: Date) -> TrainData? {
-        for journey in journeys {
-            guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }) else { continue }
-            return buildTrainData(leg: leg, now: now)
-        }
-        return nil
+        findTrainWithToken(named: trainNumber, in: journeys, now: now)?.0
     }
 
     // MARK: - Build TrainData from a leg

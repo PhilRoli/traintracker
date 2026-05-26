@@ -164,7 +164,8 @@ final class TrainFetcherTests: XCTestCase {
     private func makeJourney(
         trainName: String,
         plannedDep: String,
-        plannedArr: String = "2026-05-24T14:08:00+02:00"
+        plannedArr: String = "2026-05-24T14:08:00+02:00",
+        refreshToken: String? = nil
     ) -> APIJourney {
         let leg = APILeg(
             origin: APIStop(id: "1", name: "From"),
@@ -180,7 +181,15 @@ final class TrainFetcherTests: XCTestCase {
             arrivalPlatform: nil,
             stopovers: nil
         )
-        return APIJourney(legs: [leg], refreshToken: nil)
+        return APIJourney(legs: [leg], refreshToken: refreshToken)
+    }
+
+    private func makeConfig(fromId: String = "1", toId: String = "2", trainNumber: String? = nil) -> AppConfig {
+        var config = AppConfig()
+        config.fromStation = Station(name: "From", id: fromId)
+        config.toStation = Station(name: "To", id: toId)
+        config.trainNumber = trainNumber
+        return config
     }
 
     private func makeStopover(name: String, arr: String? = nil, dep: String? = nil) -> APIStopover {
@@ -199,5 +208,109 @@ final class TrainFetcherTests: XCTestCase {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f.string(from: date)
+    }
+
+    // MARK: - Refresh token caching
+
+    func test_refreshTokenCachedAfterFullFetch_usedOnNextCall() async {
+        let mock = MockOeBBClient()
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600)),
+            refreshToken: "tok-abc"
+        )
+        mock.journeysToReturn = [journey]
+        mock.refreshToReturn = journey
+
+        let fetcher = TrainFetcher(client: mock)
+        let config = makeConfig(trainNumber: "WB 912")
+
+        // First fetch: full batch (5 offsets)
+        _ = await fetcher.fetch(config: config)
+        XCTAssertEqual(mock.fetchJourneysCallCount, 5)
+        XCTAssertEqual(mock.refreshJourneyCallCount, 0)
+
+        // Second fetch: refresh path used, no new full-batch calls
+        _ = await fetcher.fetch(config: config)
+        XCTAssertEqual(mock.fetchJourneysCallCount, 5, "Full batch should not fire again")
+        XCTAssertEqual(mock.refreshJourneyCallCount, 1)
+    }
+
+    func test_fallsBackToFullFetchWhenRefreshFails() async {
+        let mock = MockOeBBClient()
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600)),
+            refreshToken: "tok-abc"
+        )
+        mock.journeysToReturn = [journey]
+
+        let fetcher = TrainFetcher(client: mock)
+        let config = makeConfig(trainNumber: "WB 912")
+
+        // First fetch: caches the token
+        _ = await fetcher.fetch(config: config)
+        XCTAssertEqual(mock.fetchJourneysCallCount, 5)
+
+        // Make refresh fail
+        mock.refreshError = OeBBError.httpError(404)
+
+        // Second fetch: refresh tried once, then full batch again
+        _ = await fetcher.fetch(config: config)
+        XCTAssertEqual(mock.refreshJourneyCallCount, 1)
+        XCTAssertEqual(mock.fetchJourneysCallCount, 10, "Full batch should fire after refresh failure")
+    }
+
+    func test_cacheInvalidatedOnConfigChange() async {
+        let mock = MockOeBBClient()
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600)),
+            refreshToken: "tok-abc"
+        )
+        mock.journeysToReturn = [journey]
+        mock.refreshToReturn = journey
+
+        let fetcher = TrainFetcher(client: mock)
+        let config = makeConfig(trainNumber: "WB 912")
+
+        // Prime the cache
+        _ = await fetcher.fetch(config: config)
+        XCTAssertEqual(mock.fetchJourneysCallCount, 5)
+
+        // Switch to a different train — cache must be invalidated
+        let newConfig = makeConfig(trainNumber: "RJX 100")
+        _ = await fetcher.fetch(config: newConfig)
+        XCTAssertEqual(mock.refreshJourneyCallCount, 0, "Should not use stale token for a different train")
+        XCTAssertEqual(mock.fetchJourneysCallCount, 10, "Must do a full batch for the new config")
+    }
+}
+
+// MARK: - MockOeBBClient
+
+private final class MockOeBBClient: OeBBClientProtocol {
+    var journeysToReturn: [APIJourney] = []
+    var refreshToReturn: APIJourney?
+    var refreshError: Error?
+    var fetchJourneysCallCount = 0
+    var refreshJourneyCallCount = 0
+
+    func searchStations(query: String) async throws -> [APILocation] { [] }
+
+    func fetchJourneys(fromId: String, toId: String, departure: Date) async throws -> [APIJourney] {
+        fetchJourneysCallCount += 1
+        return journeysToReturn
+    }
+
+    func refreshJourney(token: String) async throws -> APIJourney {
+        refreshJourneyCallCount += 1
+        if let error = refreshError { throw error }
+        return refreshToReturn!
     }
 }
