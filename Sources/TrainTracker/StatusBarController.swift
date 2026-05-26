@@ -60,21 +60,22 @@ final class StatusBarController {
         case .error:
             return consecutiveErrors >= 2 ? "🚂 (!)" : "🚂"
         case .tracking(let td, _):
+            let shortName = td.trainName.replacing(#/\s*\(Train-No\.[^)]*\)/#, with: "")
             let emoji = trainTypeEmoji(td.trainName)
             let rtArr = td.scheduledArrival.addingTimeInterval(TimeInterval(td.arrivalDelaySecs))
             let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
 
             if rtArr <= now {
-                return "\(emoji) \(td.trainName) Arrived"
+                return "\(emoji) \(shortName) Arrived"
             } else if td.isEnRoute {
                 let minsLeft = max(0, Int(rtArr.timeIntervalSince(now) / 60))
                 let delay = formatDelay(td.arrivalDelaySecs)
                 return delay.isEmpty
-                    ? "\(emoji) \(td.trainName) \(minsLeft)m"
-                    : "\(emoji) \(td.trainName) \(minsLeft)m \(delay)"
+                    ? "\(emoji) \(shortName) \(minsLeft)m"
+                    : "\(emoji) \(shortName) \(minsLeft)m \(delay)"
             } else {
                 let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
-                return "\(emoji) \(td.trainName) in \(mins)m"
+                return "\(emoji) \(shortName) in \(mins)m"
             }
         }
     }

@@ -3,7 +3,7 @@ import UserNotifications
 import Foundation
 
 protocol NotificationScheduler {
-    func add(_ request: UNNotificationRequest, withCompletionHandler completionHandler: ((Error?) -> Void)?)
+    func add(_ request: UNNotificationRequest, withCompletionHandler completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
 extension UNUserNotificationCenter: NotificationScheduler {}
