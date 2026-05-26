@@ -61,6 +61,7 @@ final class TrainFetcher {
             cachedRefreshToken = nil
             return nil
         }
+        cachedRefreshToken = journey.refreshToken ?? token
         return td
     }
 
