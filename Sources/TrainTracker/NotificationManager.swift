@@ -68,7 +68,16 @@ final class NotificationManager {
     }
 
     private func processDelayAlert(data: TrainData, settings: NotificationSettings, key: String) {
-        // stub — implemented in Task 4
+        defer { lastDelaySecs = data.arrivalDelaySecs }
+        guard settings.delayAlertEnabled else { return }
+        let threshold = settings.delayAlertThresholdMinutes * 60
+        guard data.arrivalDelaySecs >= threshold, lastDelaySecs < threshold else { return }
+
+        let content = UNMutableNotificationContent()
+        let mins = (data.arrivalDelaySecs + 59) / 60
+        content.title = "\(data.trainName) is now +\(mins)m late"
+        content.body = "Arrives at \(data.toName)"
+        post(identifier: "delay-\(key)", content: content)
     }
 
     private func processPlatformChange(data: TrainData, settings: NotificationSettings, key: String) {

@@ -156,4 +156,61 @@ final class NotificationManagerTests: XCTestCase {
         XCTAssertEqual(spy.posted.count, 1)
         XCTAssertTrue(spy.posted[0].body.contains("3"))
     }
+
+    // MARK: - Delay alert
+
+    func test_delayAlert_firesWhenCrossingThreshold() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.delayAlertThresholdMinutes = 10
+
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        // First call: 5 minutes late (below threshold)
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       arrivalDelaySecs: 5 * 60, isEnRoute: true), settings: settings)
+        XCTAssertEqual(spy.posted.count, 0)
+
+        // Second call: 12 minutes late (crosses 10m threshold)
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       arrivalDelaySecs: 12 * 60, isEnRoute: true), settings: settings)
+        XCTAssertEqual(spy.posted.count, 1)
+        XCTAssertTrue(spy.posted[0].identifier.hasPrefix("delay-"))
+        XCTAssertTrue(spy.posted[0].title.contains("WB 912"))
+        XCTAssertTrue(spy.posted[0].title.contains("+12m"))
+    }
+
+    func test_delayAlert_doesNotFireAgainWhenAlreadyAboveThreshold() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.delayAlertThresholdMinutes = 10
+
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        // Cross threshold
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       arrivalDelaySecs: 12 * 60, isEnRoute: true), settings: settings)
+        // Delay increases further (still above threshold)
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       arrivalDelaySecs: 18 * 60, isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 1, "Should only fire once when crossing, not on every update above threshold")
+    }
+
+    func test_delayAlert_doesNotFireWhenDisabled() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.delayAlertEnabled = false
+        settings.delayAlertThresholdMinutes = 10
+
+        let dep = Date().addingTimeInterval(-3600)
+        let arr = Date().addingTimeInterval(3600)
+
+        manager.process(makeTrainData(scheduledDeparture: dep, scheduledArrival: arr,
+                                       arrivalDelaySecs: 15 * 60, isEnRoute: true), settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 0)
+    }
 }
