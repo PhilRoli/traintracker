@@ -161,13 +161,13 @@ final class PreferencesWindowController: NSWindowController {
         cv.addSubview(delayAlertCheckbox)
 
         delayAlertField = makeNumberField()
-        delayAlertField.frame = NSRect(x: 182, y: 82, width: 40, height: 20)
+        delayAlertField.frame = NSRect(x: 192, y: 82, width: 40, height: 20)
         delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
         delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
         cv.addSubview(delayAlertField)
 
         let delayMinLabel = makeLabel("+ minutes late")
-        delayMinLabel.frame = NSRect(x: 228, y: 82, width: 130, height: 20)
+        delayMinLabel.frame = NSRect(x: 238, y: 82, width: 120, height: 20)
         cv.addSubview(delayMinLabel)
 
         // Platform change row
