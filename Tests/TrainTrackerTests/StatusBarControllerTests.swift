@@ -14,7 +14,7 @@ final class StatusBarControllerTests: XCTestCase {
     }
 
     func test_titleForErrorAfterTwoFailures() {
-        let title = StatusBarController.titleString(for: .error("oops"), consecutiveErrors: 2)
+        let title = StatusBarController.titleString(for: .error("oops", []), consecutiveErrors: 2)
         XCTAssertEqual(title, "🚂 (!)")
     }
 

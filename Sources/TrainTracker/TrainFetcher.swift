@@ -3,7 +3,8 @@ import Foundation
 
 final class TrainFetcher {
     private let client: any OeBBClientProtocol
-    private static let offsets: [TimeInterval] = [-6 * 3600, -4 * 3600, -2 * 3600, -1800, 0]
+    private static let offsets: [TimeInterval] =
+        [-6 * 3600, -4 * 3600] + stride(from: -120 * 60, through: 15 * 60, by: 15 * 60).map(TimeInterval.init)
 
     // Refresh-token cache — all access is sequential via StatusBarController's timer
     private var cachedRefreshToken: String?
@@ -44,7 +45,7 @@ final class TrainFetcher {
             return .pickTrain(options)
         }
         guard let (td, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
-            return .error("\(trainNumber) not found — use Switch Train to reselect")
+            return .error("\(trainNumber) not found — use Switch Train to reselect", options)
         }
         if let t = token { cachedRefreshToken = t }
         return .tracking(td, options)

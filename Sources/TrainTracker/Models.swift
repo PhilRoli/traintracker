@@ -63,7 +63,7 @@ enum TrainStatus {
     case noConfig
     case pickTrain([TrainOption])
     case tracking(TrainData, [TrainOption])   // second arg: available trains for Switch Train submenu
-    case error(String)
+    case error(String, [TrainOption])
 }
 
 struct TrainData {

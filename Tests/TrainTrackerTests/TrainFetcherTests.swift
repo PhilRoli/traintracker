@@ -226,18 +226,18 @@ final class TrainFetcherTests: XCTestCase {
         let fetcher = TrainFetcher(client: mock)
         let config = makeConfig(trainNumber: "WB 912")
 
-        // First fetch: full batch (5 offsets)
+        // First fetch: full batch
         _ = await fetcher.fetch(config: config)
         let fetchCount1 = await mock.fetchJourneysCallCount
         let refreshCount1 = await mock.refreshJourneyCallCount
-        XCTAssertEqual(fetchCount1, 5)
+        XCTAssertEqual(fetchCount1, 12)
         XCTAssertEqual(refreshCount1, 0)
 
         // Second fetch: refresh path used, no new full-batch calls
         _ = await fetcher.fetch(config: config)
         let fetchCount2 = await mock.fetchJourneysCallCount
         let refreshCount2 = await mock.refreshJourneyCallCount
-        XCTAssertEqual(fetchCount2, 5, "Full batch should not fire again")
+        XCTAssertEqual(fetchCount2, 12, "Full batch should not fire again")
         XCTAssertEqual(refreshCount2, 1)
     }
 
@@ -258,7 +258,7 @@ final class TrainFetcherTests: XCTestCase {
         // First fetch: caches the token
         _ = await fetcher.fetch(config: config)
         let fetchCount1 = await mock.fetchJourneysCallCount
-        XCTAssertEqual(fetchCount1, 5)
+        XCTAssertEqual(fetchCount1, 12)
 
         // Make refresh fail
         await mock.setRefreshError(OeBBError.httpError(404))
@@ -268,7 +268,7 @@ final class TrainFetcherTests: XCTestCase {
         let refreshCount2 = await mock.refreshJourneyCallCount
         let fetchCount2 = await mock.fetchJourneysCallCount
         XCTAssertEqual(refreshCount2, 1)
-        XCTAssertEqual(fetchCount2, 10, "Full batch should fire after refresh failure")
+        XCTAssertEqual(fetchCount2, 24, "Full batch should fire after refresh failure")
     }
 
     func test_cacheInvalidatedOnConfigChange() async {
@@ -288,7 +288,7 @@ final class TrainFetcherTests: XCTestCase {
         // Prime the cache
         _ = await fetcher.fetch(config: config)
         let fetchCount1 = await mock.fetchJourneysCallCount
-        XCTAssertEqual(fetchCount1, 5)
+        XCTAssertEqual(fetchCount1, 12)
 
         // Switch to a different train — cache must be invalidated
         let newConfig = makeConfig(trainNumber: "RJX 100")
@@ -296,7 +296,7 @@ final class TrainFetcherTests: XCTestCase {
         let refreshCount2 = await mock.refreshJourneyCallCount
         let fetchCount2 = await mock.fetchJourneysCallCount
         XCTAssertEqual(refreshCount2, 0, "Should not use stale token for a different train")
-        XCTAssertEqual(fetchCount2, 10, "Must do a full batch for the new config")
+        XCTAssertEqual(fetchCount2, 24, "Must do a full batch for the new config")
     }
 
     func test_refreshTokenUpdatedAfterSuccessfulRefresh() async {
@@ -322,7 +322,7 @@ final class TrainFetcherTests: XCTestCase {
         // First fetch: caches tok-first
         _ = await fetcher.fetch(config: config)
         let fetchCount1 = await mock.fetchJourneysCallCount
-        XCTAssertEqual(fetchCount1, 5)
+        XCTAssertEqual(fetchCount1, 12)
 
         // Second fetch: refresh succeeds, should update to tok-second
         _ = await fetcher.fetch(config: config)
@@ -335,7 +335,7 @@ final class TrainFetcherTests: XCTestCase {
         let refreshCount3 = await mock.refreshJourneyCallCount
         let fetchCount3 = await mock.fetchJourneysCallCount
         XCTAssertEqual(refreshCount3, 2, "Third fetch must use the rotated token")
-        XCTAssertEqual(fetchCount3, 5, "No fallback to full batch expected")
+        XCTAssertEqual(fetchCount3, 12, "No fallback to full batch expected")
     }
 }
 

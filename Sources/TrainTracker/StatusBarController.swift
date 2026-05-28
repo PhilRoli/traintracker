@@ -157,8 +157,15 @@ final class StatusBarController {
             menu.addItem(switchItem)
             menu.addItem(makeRouteSubmenu(config: config))
 
-        case .error(let msg):
+        case .error(let msg, let options):
             menu.addItem(disabled(msg))
+            menu.addItem(.separator())
+            let switchItem = NSMenuItem(title: "Switch Train…", action: nil, keyEquivalent: "")
+            let switchSub = NSMenu()
+            addTrainOptions(options, to: switchSub, currentTrain: nil)
+            switchItem.submenu = switchSub
+            menu.addItem(switchItem)
+            menu.addItem(makeRouteSubmenu(config: config))
         }
 
         menu.addItem(.separator())

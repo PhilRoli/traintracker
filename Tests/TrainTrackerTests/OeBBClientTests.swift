@@ -6,7 +6,7 @@ final class OeBBClientTests: XCTestCase {
     func test_searchStationsURL() {
         let url = OeBBClient.locationsURL(query: "Linz Hbf")
         XCTAssertNotNil(url)
-        XCTAssertTrue(url!.absoluteString.contains("oebb.macistry.com"))
+        XCTAssertTrue(url!.absoluteString.contains("oebb.rolinek.at"))
         XCTAssertTrue(url!.absoluteString.contains("locations"))
         XCTAssertTrue(url!.absoluteString.contains("Linz"))
     }
