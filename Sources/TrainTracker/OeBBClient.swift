@@ -13,7 +13,7 @@ enum OeBBError: Error {
 }
 
 final class OeBBClient: OeBBClientProtocol {
-    static let baseURL = "https://oebb.macistry.com/api"
+    static let baseURL = "https://oebb.rolinek.at"
     private let session: URLSession
 
     init() {
