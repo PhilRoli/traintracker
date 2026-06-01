@@ -155,6 +155,7 @@ final class StatusBarController {
             addTrainOptions(options, to: switchSub, currentTrain: td.trainName)
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
+            menu.addItem(action("Deselect Train", #selector(deselectTrain), key: ""))
             menu.addItem(makeRouteSubmenu(config: config))
 
         case .error(let msg, let options):
@@ -272,6 +273,13 @@ final class StatusBarController {
         guard let name = sender.representedObject as? String else { return }
         var config = AppConfigStore.shared.load()
         config.trainNumber = name
+        AppConfigStore.shared.save(config)
+        Task { await refresh() }
+    }
+
+    @objc private func deselectTrain() {
+        var config = AppConfigStore.shared.load()
+        config.trainNumber = nil
         AppConfigStore.shared.save(config)
         Task { await refresh() }
     }
