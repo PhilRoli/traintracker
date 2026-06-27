@@ -43,8 +43,14 @@ final class StatusBarController {
 
         // Show last good data for transient errors; show error UI after 2 consecutive failures
         let displayStatus: TrainStatus = consecutiveErrors >= 2 ? status : lastGoodStatus
-        statusItem.button?.title = Self.titleString(for: displayStatus, consecutiveErrors: consecutiveErrors)
+        let title = Self.titleString(for: displayStatus, consecutiveErrors: consecutiveErrors)
+        statusItem.button?.title = title
         statusItem.menu = buildMenu(for: displayStatus)
+        if case .tracking = displayStatus {
+            AppConfigStore.shared.setStatusLine(title)
+        } else {
+            AppConfigStore.shared.setStatusLine(nil)
+        }
 
         if case .tracking(let td, _) = displayStatus {
             notificationManager.process(td, settings: config.notifications)

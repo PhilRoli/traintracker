@@ -87,4 +87,17 @@ final class AppConfigTests: XCTestCase {
         XCTAssertTrue(config.notifications.departureReminderEnabled)
         XCTAssertEqual(config.notifications.departureReminderMinutes, 10)
     }
+
+    func test_setStatusLine_writesString() {
+        store.setStatusLine("⚡ RJX 12m")
+        let value = UserDefaults(suiteName: store.suiteName)?.string(forKey: "statusLine")
+        XCTAssertEqual(value, "⚡ RJX 12m")
+    }
+
+    func test_setStatusLine_clearsWhenNil() {
+        store.setStatusLine("⚡ RJX 12m")
+        store.setStatusLine(nil)
+        let value = UserDefaults(suiteName: store.suiteName)?.string(forKey: "statusLine")
+        XCTAssertNil(value)
+    }
 }

@@ -62,8 +62,10 @@ final class AppConfigStore {
 
     private let key = "config"
     private let defaults: UserDefaults
+    let suiteName: String
 
     init(suiteName: String = "traintracker") {
+        self.suiteName = suiteName
         defaults = UserDefaults(suiteName: suiteName) ?? .standard
     }
 
@@ -77,5 +79,13 @@ final class AppConfigStore {
     func save(_ config: AppConfig) {
         guard let data = try? JSONEncoder().encode(config) else { return }
         defaults.set(data, forKey: key)
+    }
+
+    func setStatusLine(_ line: String?) {
+        if let line {
+            defaults.set(line, forKey: "statusLine")
+        } else {
+            defaults.removeObject(forKey: "statusLine")
+        }
     }
 }
