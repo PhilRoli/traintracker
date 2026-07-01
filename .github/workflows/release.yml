@@ -51,7 +51,7 @@ jobs:
           version = os.environ['VERSION']
           sha256  = os.environ['SHA256']
 
-          path = 'homebrew-tap/Cask/traintracker.rb'
+          path = 'homebrew-tap/Casks/traintracker.rb'
           text = open(path).read()
           text = re.sub(r'version "[^"]*"', f'version "{version}"', text)
           text = re.sub(r'sha256 "[^"]*"', f'sha256 "{sha256}"', text)
@@ -64,6 +64,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cask/traintracker.rb
+          git add Casks/traintracker.rb
           git diff --staged --quiet || git commit -m "traintracker ${{ github.ref_name }}"
           git push
