@@ -21,7 +21,7 @@ final class PreferencesWindowController: NSWindowController {
     private var searchTask: Task<Void, Never>?
     var deleteRouteButton: NSButton!
     private let client = OeBBClient()
-    var loginItemController = LoginItemController()
+    let loginItemController = LoginItemController()
     private var launchAtLoginCheckbox: NSButton!
 
     var departureReminderCheckbox: NSButton!
