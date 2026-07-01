@@ -1,5 +1,6 @@
 // Sources/TrainTracker/PreferencesWindowController.swift
 import AppKit
+import UniformTypeIdentifiers
 
 @MainActor
 final class PreferencesWindowController: NSWindowController {
@@ -20,6 +21,8 @@ final class PreferencesWindowController: NSWindowController {
     private var searchTask: Task<Void, Never>?
     private var deleteRouteButton: NSButton!
     private let client = OeBBClient()
+    private let loginItemController = LoginItemController()
+    private var launchAtLoginCheckbox: NSButton!
 
     private var departureReminderCheckbox: NSButton!
     private var departureReminderField: NSTextField!
@@ -32,7 +35,7 @@ final class PreferencesWindowController: NSWindowController {
 
     convenience init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 510),
             styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -58,28 +61,28 @@ final class PreferencesWindowController: NSWindowController {
 
         // From row
         let fromLabel = makeLabel("From:")
-        fromLabel.frame = NSRect(x: 16, y: 392, width: 50, height: 20)
+        fromLabel.frame = NSRect(x: 16, y: 462, width: 50, height: 20)
         cv.addSubview(fromLabel)
 
         fromField = makeTextField(placeholder: "Search for station…")
-        fromField.frame = NSRect(x: 70, y: 388, width: 314, height: 24)
+        fromField.frame = NSRect(x: 70, y: 458, width: 314, height: 24)
         fromField.stringValue = pendingFrom?.name ?? ""
         fromField.delegate = self
         cv.addSubview(fromField)
 
         // To row
         let toLabel = makeLabel("To:")
-        toLabel.frame = NSRect(x: 16, y: 360, width: 50, height: 20)
+        toLabel.frame = NSRect(x: 16, y: 430, width: 50, height: 20)
         cv.addSubview(toLabel)
 
         toField = makeTextField(placeholder: "Search for station…")
-        toField.frame = NSRect(x: 70, y: 356, width: 314, height: 24)
+        toField.frame = NSRect(x: 70, y: 426, width: 314, height: 24)
         toField.stringValue = pendingTo?.name ?? ""
         toField.delegate = self
         cv.addSubview(toField)
 
         // Search results table (hidden until there are results)
-        resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 272, width: 314, height: 76))
+        resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 342, width: 314, height: 76))
         resultsScrollView.hasVerticalScroller = true
         resultsScrollView.borderType = .bezelBorder
         resultsTable = NSTableView()
@@ -97,19 +100,19 @@ final class PreferencesWindowController: NSWindowController {
 
         // Saved routes label
         let routesLabel = makeLabel("Saved routes:")
-        routesLabel.frame = NSRect(x: 16, y: 248, width: 120, height: 20)
+        routesLabel.frame = NSRect(x: 16, y: 318, width: 120, height: 20)
         cv.addSubview(routesLabel)
 
         // "–" delete button aligned with the label
         let deleteBtn = NSButton(title: "–", target: self, action: #selector(deleteSelectedRoute))
         deleteBtn.bezelStyle = .smallSquare
-        deleteBtn.frame = NSRect(x: 352, y: 244, width: 32, height: 24)
+        deleteBtn.frame = NSRect(x: 352, y: 314, width: 32, height: 24)
         deleteBtn.isEnabled = false
         cv.addSubview(deleteBtn)
         deleteRouteButton = deleteBtn
 
         // Saved routes table (single column, full-width)
-        let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 164, width: 368, height: 76))
+        let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 234, width: 368, height: 76))
         savedScrollView.hasVerticalScroller = true
         savedScrollView.borderType = .bezelBorder
         let deletable = DeletableTableView()
@@ -127,61 +130,78 @@ final class PreferencesWindowController: NSWindowController {
         savedScrollView.documentView = savedRoutesTable
         cv.addSubview(savedScrollView)
 
-        // Save & Close button
-        let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
-        saveBtn.bezelStyle = .rounded
-        saveBtn.frame = NSRect(x: 284, y: 8, width: 100, height: 28)
-        cv.addSubview(saveBtn)
-
         // Notifications section separator
         let notifSeparator = NSBox()
         notifSeparator.boxType = .separator
-        notifSeparator.frame = NSRect(x: 16, y: 156, width: 368, height: 1)
+        notifSeparator.frame = NSRect(x: 16, y: 226, width: 368, height: 1)
         cv.addSubview(notifSeparator)
 
         // Section label
         let notifLabel = makeLabel("Notifications")
         notifLabel.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        notifLabel.frame = NSRect(x: 16, y: 136, width: 200, height: 18)
+        notifLabel.frame = NSRect(x: 16, y: 206, width: 200, height: 18)
         cv.addSubview(notifLabel)
 
         // Departure reminder row
         departureReminderCheckbox = NSButton(checkboxWithTitle: "Departure reminder", target: self, action: #selector(notifCheckboxChanged(_:)))
-        departureReminderCheckbox.frame = NSRect(x: 16, y: 110, width: 170, height: 20)
+        departureReminderCheckbox.frame = NSRect(x: 16, y: 180, width: 170, height: 20)
         departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
         cv.addSubview(departureReminderCheckbox)
 
         departureReminderField = makeNumberField()
-        departureReminderField.frame = NSRect(x: 192, y: 110, width: 40, height: 20)
+        departureReminderField.frame = NSRect(x: 192, y: 180, width: 40, height: 20)
         departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
         departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
         cv.addSubview(departureReminderField)
 
         let depMinLabel = makeLabel("minutes before")
-        depMinLabel.frame = NSRect(x: 238, y: 110, width: 120, height: 20)
+        depMinLabel.frame = NSRect(x: 238, y: 180, width: 120, height: 20)
         cv.addSubview(depMinLabel)
 
         // Delay alert row
         delayAlertCheckbox = NSButton(checkboxWithTitle: "Delay alert when", target: self, action: #selector(notifCheckboxChanged(_:)))
-        delayAlertCheckbox.frame = NSRect(x: 16, y: 82, width: 160, height: 20)
+        delayAlertCheckbox.frame = NSRect(x: 16, y: 152, width: 160, height: 20)
         delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
         cv.addSubview(delayAlertCheckbox)
 
         delayAlertField = makeNumberField()
-        delayAlertField.frame = NSRect(x: 192, y: 82, width: 40, height: 20)
+        delayAlertField.frame = NSRect(x: 192, y: 152, width: 40, height: 20)
         delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
         delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
         cv.addSubview(delayAlertField)
 
         let delayMinLabel = makeLabel("+ minutes late")
-        delayMinLabel.frame = NSRect(x: 238, y: 82, width: 120, height: 20)
+        delayMinLabel.frame = NSRect(x: 238, y: 152, width: 120, height: 20)
         cv.addSubview(delayMinLabel)
 
         // Platform change row
         platformChangeCheckbox = NSButton(checkboxWithTitle: "Platform change alert", target: self, action: #selector(notifCheckboxChanged(_:)))
-        platformChangeCheckbox.frame = NSRect(x: 16, y: 54, width: 220, height: 20)
+        platformChangeCheckbox.frame = NSRect(x: 16, y: 124, width: 220, height: 20)
         platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
         cv.addSubview(platformChangeCheckbox)
+
+        // Save & Close button
+        let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
+        saveBtn.bezelStyle = .rounded
+        saveBtn.frame = NSRect(x: 284, y: 78, width: 100, height: 28)
+        cv.addSubview(saveBtn)
+
+        // Launch at Login checkbox
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: #selector(launchAtLoginChanged(_:)))
+        launchAtLoginCheckbox.frame = NSRect(x: 16, y: 46, width: 200, height: 20)
+        launchAtLoginCheckbox.state = loginItemController.isEnabled ? .on : .off
+        cv.addSubview(launchAtLoginCheckbox)
+
+        // Export / Import config buttons
+        let exportBtn = NSButton(title: "Export Config…", target: self, action: #selector(exportConfig))
+        exportBtn.bezelStyle = .rounded
+        exportBtn.frame = NSRect(x: 16, y: 8, width: 150, height: 28)
+        cv.addSubview(exportBtn)
+
+        let importBtn = NSButton(title: "Import Config…", target: self, action: #selector(importConfig))
+        importBtn.bezelStyle = .rounded
+        importBtn.frame = NSRect(x: 174, y: 8, width: 150, height: 28)
+        cv.addSubview(importBtn)
     }
 
     // MARK: - Debounced search
@@ -285,6 +305,72 @@ final class PreferencesWindowController: NSWindowController {
         )
         AppConfigStore.shared.save(config)
         close()
+    }
+
+    @objc private func launchAtLoginChanged(_ sender: NSButton) {
+        let wantsEnabled = sender.state == .on
+        guard loginItemController.setEnabled(wantsEnabled) else {
+            sender.state = wantsEnabled ? .off : .on
+            showAlert(
+                title: "Couldn't update login item",
+                message: "macOS declined to \(wantsEnabled ? "register" : "unregister") TrainTracker as a login item."
+            )
+            return
+        }
+    }
+
+    @objc private func exportConfig() {
+        let config = AppConfigStore.shared.load()
+        guard let data = try? ConfigTransfer.exportData(config) else {
+            showAlert(title: "Export failed", message: "Couldn't encode the current configuration.")
+            return
+        }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "traintracker-config.json"
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try data.write(to: url)
+        } catch {
+            showAlert(title: "Export failed", message: error.localizedDescription)
+        }
+    }
+
+    @objc private func importConfig() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let config = try ConfigTransfer.importConfig(from: data)
+            AppConfigStore.shared.save(config)
+            loadCurrentConfig()
+            refreshFieldsFromLoadedConfig()
+        } catch {
+            showAlert(title: "Import failed", message: "Couldn't read that file as a valid TrainTracker config.")
+        }
+    }
+
+    private func refreshFieldsFromLoadedConfig() {
+        fromField.stringValue = pendingFrom?.name ?? ""
+        toField.stringValue = pendingTo?.name ?? ""
+        savedRoutesTable.reloadData()
+        departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
+        departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
+        departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
+        delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
+        delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
+        delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
+        platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     @MainActor override func close() {
