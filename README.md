@@ -7,7 +7,7 @@ macOS menu bar app for tracking Austrian (ÖBB) trains in real time.
 ### Homebrew
 
 ```bash
-brew tap philroli/tap
+brew tap PhilRoli/tap
 brew install --cask traintracker
 ```
 
@@ -22,7 +22,7 @@ xattr -dr com.apple.quarantine /Applications/TrainTracker.app
 Requires Swift 5.9+ / macOS 13+, no third-party dependencies:
 
 ```bash
-git clone https://github.com/philroli/traintracker
+git clone https://github.com/PhilRoli/traintracker
 cd traintracker
 ./rebuild.sh
 ```
