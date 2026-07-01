@@ -342,7 +342,7 @@ extension PreferencesWindowController: NSTableViewDataSource, NSTableViewDelegat
 
 // MARK: - DeletableTableView
 
-private class DeletableTableView: NSTableView {
+class DeletableTableView: NSTableView {
     var onDelete: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
