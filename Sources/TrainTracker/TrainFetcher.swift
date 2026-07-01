@@ -3,8 +3,12 @@ import Foundation
 
 final class TrainFetcher {
     private let client: any OeBBClientProtocol
-    private static let offsets: [TimeInterval] =
-        [-6 * 3600, -4 * 3600] + stride(from: -120 * 60, through: 15 * 60, by: 15 * 60).map(TimeInterval.init)
+    private static let offsets: [TimeInterval] = {
+        let wideOffsets: [TimeInterval] = [-21600, -14400] // -6h, -4h
+        let quarterHourOffsets: [TimeInterval] = stride(from: -7200, through: 900, by: 900)
+            .map { TimeInterval($0) }
+        return wideOffsets + quarterHourOffsets
+    }()
 
     // Refresh-token cache — all access is sequential via StatusBarController's timer
     private var cachedRefreshToken: String?
