@@ -21,11 +21,11 @@ final class StatusBarController {
     // MARK: - Timer
 
     private func startTimer() {
-        let t = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+        let newTimer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.refresh() }
         }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        RunLoop.main.add(newTimer, forMode: .common)
+        timer = newTimer
     }
 
     // MARK: - Refresh
@@ -52,8 +52,8 @@ final class StatusBarController {
             AppConfigStore.shared.setStatusLine(nil)
         }
 
-        if case .tracking(let td, _) = displayStatus {
-            notificationManager.process(td, settings: config.notifications)
+        if case .tracking(let trainData, _) = displayStatus {
+            notificationManager.process(trainData, settings: config.notifications)
         }
     }
 
@@ -65,17 +65,17 @@ final class StatusBarController {
             return "🚂"
         case .error:
             return consecutiveErrors >= 2 ? "🚂 (!)" : "🚂"
-        case .tracking(let td, _):
-            let shortName = td.trainName.replacing(#/\s*\(Train-No\.[^)]*\)/#, with: "")
-            let emoji = trainTypeEmoji(td.trainName)
-            let rtArr = td.scheduledArrival.addingTimeInterval(TimeInterval(td.arrivalDelaySecs))
-            let rtDep = td.scheduledDeparture.addingTimeInterval(TimeInterval(td.departureDelaySecs))
+        case .tracking(let trainData, _):
+            let shortName = trainData.trainName.replacing(#/\s*\(Train-No\.[^)]*\)/#, with: "")
+            let emoji = trainTypeEmoji(trainData.trainName)
+            let rtArr = trainData.scheduledArrival.addingTimeInterval(TimeInterval(trainData.arrivalDelaySecs))
+            let rtDep = trainData.scheduledDeparture.addingTimeInterval(TimeInterval(trainData.departureDelaySecs))
 
             if rtArr <= now {
                 return "\(emoji) \(shortName) Arrived"
-            } else if td.isEnRoute {
+            } else if trainData.isEnRoute {
                 let minsLeft = max(0, Int(rtArr.timeIntervalSince(now) / 60))
-                let delay = formatDelay(td.arrivalDelaySecs)
+                let delay = formatDelay(trainData.arrivalDelaySecs)
                 return delay.isEmpty
                     ? "\(emoji) \(shortName) \(minsLeft)m"
                     : "\(emoji) \(shortName) \(minsLeft)m \(delay)"
@@ -89,29 +89,29 @@ final class StatusBarController {
     // MARK: - Train type emoji
 
     nonisolated static func trainTypeEmoji(_ name: String) -> String {
-        let u = name.uppercased()
-        if u.hasPrefix("RJX") { return "⚡" }
-        if u.hasPrefix("RJ")  { return "🚄" }
-        if u.hasPrefix("WB")  { return "🟦" }
-        if u.hasPrefix("ICE") || u.hasPrefix("IC") || u.hasPrefix("EC") { return "🚆" }
-        if u.hasPrefix("REX") { return "🚂" }
-        if u.hasPrefix("EN")  || u.hasPrefix("NJ") { return "🌙" }
-        if u.lowercased().hasPrefix("bus") { return "🚌" }
-        if u.hasPrefix("S"), let second = u.dropFirst().first, second.isNumber { return "🚇" }
+        let upper = name.uppercased()
+        if upper.hasPrefix("RJX") { return "⚡" }
+        if upper.hasPrefix("RJ") { return "🚄" }
+        if upper.hasPrefix("WB") { return "🟦" }
+        if upper.hasPrefix("ICE") || upper.hasPrefix("IC") || upper.hasPrefix("EC") { return "🚆" }
+        if upper.hasPrefix("REX") { return "🚂" }
+        if upper.hasPrefix("EN") || upper.hasPrefix("NJ") { return "🌙" }
+        if upper.lowercased().hasPrefix("bus") { return "🚌" }
+        if upper.hasPrefix("S"), let second = upper.dropFirst().first, second.isNumber { return "🚇" }
         return "🚊"
     }
 
     // MARK: - Formatting helpers
 
     private nonisolated static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
     }()
 
     nonisolated static func formatHHMM(_ date: Date, delaySecs: Int) -> String {
-        let rt = date.addingTimeInterval(TimeInterval(delaySecs))
-        return Self.timeFormatter.string(from: rt)
+        let adjusted = date.addingTimeInterval(TimeInterval(delaySecs))
+        return Self.timeFormatter.string(from: adjusted)
     }
 
     nonisolated static func formatDelay(_ secs: Int) -> String {
@@ -119,15 +119,17 @@ final class StatusBarController {
         let mins = (abs(secs) + 59) / 60
         return secs > 0 ? "+\(mins)m" : "-\(mins)m"
     }
+}
 
-    // MARK: - Menu building
+// MARK: - Menu building
 
+extension StatusBarController {
     private func makeRouteSubmenu(config: AppConfig) -> NSMenuItem {
         let item = NSMenuItem(title: "Switch Route…", action: nil, keyEquivalent: "")
         let sub = NSMenu()
-        var currentRoute: SavedRoute? = nil
-        if let from = config.fromStation, let to = config.toStation {
-            currentRoute = config.savedRoutes.first { $0.from == from && $0.to == to }
+        var currentRoute: SavedRoute?
+        if let from = config.fromStation, let destination = config.toStation {
+            currentRoute = config.savedRoutes.first { $0.from == from && $0.toStation == destination }
         }
         addRouteOptions(config.savedRoutes, to: sub, currentRoute: currentRoute)
         item.submenu = sub
@@ -149,16 +151,16 @@ final class StatusBarController {
             menu.addItem(.separator())
             menu.addItem(makeRouteSubmenu(config: config))
 
-        case .tracking(let td, let options):
-            addTrackingHeader(td, to: menu)
-            if !td.stopovers.isEmpty {
+        case .tracking(let trainData, let options):
+            addTrackingHeader(trainData, to: menu)
+            if !trainData.stopovers.isEmpty {
                 menu.addItem(.separator())
-                addStopovers(td.stopovers, to: menu)
+                addStopovers(trainData.stopovers, to: menu)
             }
             menu.addItem(.separator())
             let switchItem = NSMenuItem(title: "Switch Train…", action: nil, keyEquivalent: "")
             let switchSub = NSMenu()
-            addTrainOptions(options, to: switchSub, currentTrain: td.trainName)
+            addTrainOptions(options, to: switchSub, currentTrain: trainData.trainName)
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
             menu.addItem(action("Deselect Train", #selector(deselectTrain), key: ""))
@@ -184,35 +186,35 @@ final class StatusBarController {
         return menu
     }
 
-    private func addTrackingHeader(_ td: TrainData, to menu: NSMenu) {
-        let emoji = Self.trainTypeEmoji(td.trainName)
-        menu.addItem(disabled("\(emoji) \(td.trainName) \(td.fromName) → \(td.toName)"))
+    private func addTrackingHeader(_ trainData: TrainData, to menu: NSMenu) {
+        let emoji = Self.trainTypeEmoji(trainData.trainName)
+        menu.addItem(disabled("\(emoji) \(trainData.trainName) \(trainData.fromName) → \(trainData.toName)"))
 
-        let dep = Self.formatHHMM(td.scheduledDeparture, delaySecs: td.departureDelaySecs)
-        let arr = Self.formatHHMM(td.scheduledArrival, delaySecs: td.arrivalDelaySecs)
-        let dd = Self.formatDelay(td.departureDelaySecs)
-        let ad = Self.formatDelay(td.arrivalDelaySecs)
-        let depStr = dd.isEmpty ? dep : "\(dep) \(dd)"
-        let arrStr = ad.isEmpty ? arr : "\(arr) \(ad)"
+        let dep = Self.formatHHMM(trainData.scheduledDeparture, delaySecs: trainData.departureDelaySecs)
+        let arr = Self.formatHHMM(trainData.scheduledArrival, delaySecs: trainData.arrivalDelaySecs)
+        let depDelay = Self.formatDelay(trainData.departureDelaySecs)
+        let arrDelay = Self.formatDelay(trainData.arrivalDelaySecs)
+        let depStr = depDelay.isEmpty ? dep : "\(dep) \(depDelay)"
+        let arrStr = arrDelay.isEmpty ? arr : "\(arr) \(arrDelay)"
         menu.addItem(disabled("Dep: \(depStr) Arr: \(arrStr)"))
 
-        if let dp = td.departurePlatform, let ap = td.arrivalPlatform {
-            menu.addItem(disabled("Platform: \(dp) → \(ap)"))
+        if let depPlatform = trainData.departurePlatform, let arrPlatform = trainData.arrivalPlatform {
+            menu.addItem(disabled("Platform: \(depPlatform) → \(arrPlatform)"))
         }
     }
 
     private func addStopovers(_ stopovers: [StopoverInfo], to menu: NSMenu) {
-        for sv in stopovers {
-            let timeStr = sv.scheduledArrival
-                .map { Self.formatHHMM($0, delaySecs: sv.arrivalDelaySecs) } ?? ""
-            let icon = sv.passed ? "✓" : (sv.isNext ? "📍" : "○")
-            let delay = Self.formatDelay(sv.arrivalDelaySecs)
+        for stopover in stopovers {
+            let timeStr = stopover.scheduledArrival
+                .map { Self.formatHHMM($0, delaySecs: stopover.arrivalDelaySecs) } ?? ""
+            let icon = stopover.passed ? "✓" : (stopover.isNext ? "📍" : "○")
+            let delay = Self.formatDelay(stopover.arrivalDelaySecs)
             let label = delay.isEmpty
-                ? "\(icon) \(sv.name) (\(timeStr))"
-                : "\(icon) \(sv.name) (\(timeStr) \(delay))"
+                ? "\(icon) \(stopover.name) (\(timeStr))"
+                : "\(icon) \(stopover.name) (\(timeStr) \(delay))"
             let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
             item.isEnabled = false
-            if sv.passed {
+            if stopover.passed {
                 item.attributedTitle = NSAttributedString(
                     string: label,
                     attributes: [.foregroundColor: NSColor.secondaryLabelColor]
@@ -272,9 +274,11 @@ final class StatusBarController {
         item.target = self
         return item
     }
+}
 
-    // MARK: - Actions
+// MARK: - Actions
 
+extension StatusBarController {
     @objc private func selectTrain(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         var config = AppConfigStore.shared.load()
@@ -294,7 +298,7 @@ final class StatusBarController {
         guard let route = sender.representedObject as? SavedRoute else { return }
         var config = AppConfigStore.shared.load()
         config.fromStation = route.from
-        config.toStation = route.to
+        config.toStation = route.toStation
         config.trainNumber = nil
         AppConfigStore.shared.save(config)
         Task { await refresh() }

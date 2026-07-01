@@ -9,7 +9,7 @@ final class ConfigTransferTests: XCTestCase {
         config.trainNumber = "WB 912"
         config.savedRoutes = [SavedRoute(
             from: Station(name: "Linz/Donau Hbf", id: "8100013"),
-            to: Station(name: "Salzburg Hbf", id: "8100002")
+            toStation: Station(name: "Salzburg Hbf", id: "8100002")
         )]
         config.notifications.departureReminderMinutes = 5
 
@@ -25,7 +25,7 @@ final class ConfigTransferTests: XCTestCase {
     }
 
     func test_importConfig_invalidJSON_throws() {
-        let data = "not json".data(using: .utf8)!
+        let data = Data("not json".utf8)
         XCTAssertThrowsError(try ConfigTransfer.importConfig(from: data))
     }
 }

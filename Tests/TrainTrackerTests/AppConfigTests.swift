@@ -25,7 +25,7 @@ final class AppConfigTests: XCTestCase {
         config.trainNumber = "WB 912"
         config.savedRoutes = [SavedRoute(
             from: Station(name: "Linz/Donau Hbf", id: "8100013"),
-            to: Station(name: "Salzburg Hbf", id: "8100002")
+            toStation: Station(name: "Salzburg Hbf", id: "8100002")
         )]
 
         store.save(config)
@@ -81,9 +81,10 @@ final class AppConfigTests: XCTestCase {
         {"fromStation":{"name":"Linz/Donau Hbf","id":"8100013"},
          "toStation":{"name":"Salzburg Hbf","id":"8100002"},
          "trainNumber":"WB 912","savedRoutes":[]}
-        """.data(using: .utf8)!
+        """
+        let legacyData = Data(legacyJSON.utf8)
 
-        let config = try JSONDecoder().decode(AppConfig.self, from: legacyJSON)
+        let config = try JSONDecoder().decode(AppConfig.self, from: legacyData)
         XCTAssertTrue(config.notifications.departureReminderEnabled)
         XCTAssertEqual(config.notifications.departureReminderMinutes, 10)
     }

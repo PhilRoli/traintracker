@@ -28,9 +28,10 @@ final class ModelsTests: XCTestCase {
             }]
           }]
         }
-        """.data(using: .utf8)!
+        """
+        let data = Data(json.utf8)
 
-        let response = try JSONDecoder().decode(APIJourneysResponse.self, from: json)
+        let response = try JSONDecoder().decode(APIJourneysResponse.self, from: data)
         XCTAssertEqual(response.journeys.count, 1)
         let leg = response.journeys[0].legs[0]
         XCTAssertEqual(leg.line?.name, "WB 912")
@@ -46,9 +47,10 @@ final class ModelsTests: XCTestCase {
           {"id":"8100013","name":"Linz/Donau Hbf","type":"stop"},
           {"id":"1140101","name":"Linz/Donau","type":"station"}
         ]
-        """.data(using: .utf8)!
+        """
+        let data = Data(json.utf8)
 
-        let locations = try JSONDecoder().decode([APILocation].self, from: json)
+        let locations = try JSONDecoder().decode([APILocation].self, from: data)
         XCTAssertEqual(locations.count, 2)
         XCTAssertEqual(locations[0].id, "8100013")
         XCTAssertEqual(locations[0].type, "stop")

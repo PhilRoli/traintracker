@@ -6,32 +6,32 @@ import UniformTypeIdentifiers
 final class PreferencesWindowController: NSWindowController {
     var onClose: (() -> Void)?
 
-    private var fromField: NSTextField!
-    private var toField: NSTextField!
-    private var resultsTable: NSTableView!
-    private var resultsScrollView: NSScrollView!
-    private var savedRoutesTable: NSTableView!
+    var fromField: NSTextField!
+    var toField: NSTextField!
+    var resultsTable: NSTableView!
+    var resultsScrollView: NSScrollView!
+    var savedRoutesTable: NSTableView!
 
-    private var activeField: ActiveField = .none
-    private var searchResults: [APILocation] = []
-    private var savedRoutes: [SavedRoute] = []
-    private var pendingFrom: Station?
-    private var pendingTo: Station?
+    var activeField: ActiveField = .none
+    var searchResults: [APILocation] = []
+    var savedRoutes: [SavedRoute] = []
+    var pendingFrom: Station?
+    var pendingTo: Station?
     private var searchTimer: Timer?
     private var searchTask: Task<Void, Never>?
-    private var deleteRouteButton: NSButton!
+    var deleteRouteButton: NSButton!
     private let client = OeBBClient()
-    private let loginItemController = LoginItemController()
+    var loginItemController = LoginItemController()
     private var launchAtLoginCheckbox: NSButton!
 
-    private var departureReminderCheckbox: NSButton!
-    private var departureReminderField: NSTextField!
-    private var delayAlertCheckbox: NSButton!
-    private var delayAlertField: NSTextField!
-    private var platformChangeCheckbox: NSButton!
-    private var pendingNotifications: NotificationSettings = NotificationSettings()
+    var departureReminderCheckbox: NSButton!
+    var departureReminderField: NSTextField!
+    var delayAlertCheckbox: NSButton!
+    var delayAlertField: NSTextField!
+    var platformChangeCheckbox: NSButton!
+    var pendingNotifications: NotificationSettings = NotificationSettings()
 
-    private enum ActiveField { case from, to, none }
+    enum ActiveField { case from, destination, none }
 
     convenience init() {
         let panel = NSPanel(
@@ -48,7 +48,7 @@ final class PreferencesWindowController: NSWindowController {
         setupUI()
     }
 
-    private func loadCurrentConfig() {
+    func loadCurrentConfig() {
         let config = AppConfigStore.shared.load()
         pendingFrom = config.fromStation
         pendingTo = config.toStation
@@ -57,30 +57,39 @@ final class PreferencesWindowController: NSWindowController {
     }
 
     private func setupUI() {
-        guard let cv = window?.contentView else { return }
+        guard let contentView = window?.contentView else { return }
+        setupFromToFields(in: contentView)
+        setupResultsTable(in: contentView)
+        setupSavedRoutesSection(in: contentView)
+        setupNotificationsSection(in: contentView)
+        setupBottomButtons(in: contentView)
+    }
 
+    private func setupFromToFields(in contentView: NSView) {
         // From row
         let fromLabel = makeLabel("From:")
         fromLabel.frame = NSRect(x: 16, y: 462, width: 50, height: 20)
-        cv.addSubview(fromLabel)
+        contentView.addSubview(fromLabel)
 
         fromField = makeTextField(placeholder: "Search for station…")
         fromField.frame = NSRect(x: 70, y: 458, width: 314, height: 24)
         fromField.stringValue = pendingFrom?.name ?? ""
         fromField.delegate = self
-        cv.addSubview(fromField)
+        contentView.addSubview(fromField)
 
         // To row
         let toLabel = makeLabel("To:")
         toLabel.frame = NSRect(x: 16, y: 430, width: 50, height: 20)
-        cv.addSubview(toLabel)
+        contentView.addSubview(toLabel)
 
         toField = makeTextField(placeholder: "Search for station…")
         toField.frame = NSRect(x: 70, y: 426, width: 314, height: 24)
         toField.stringValue = pendingTo?.name ?? ""
         toField.delegate = self
-        cv.addSubview(toField)
+        contentView.addSubview(toField)
+    }
 
+    private func setupResultsTable(in contentView: NSView) {
         // Search results table (hidden until there are results)
         resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 342, width: 314, height: 76))
         resultsScrollView.hasVerticalScroller = true
@@ -96,19 +105,21 @@ final class PreferencesWindowController: NSWindowController {
         resultsTable.target = self
         resultsScrollView.documentView = resultsTable
         resultsScrollView.isHidden = true
-        cv.addSubview(resultsScrollView)
+        contentView.addSubview(resultsScrollView)
+    }
 
+    private func setupSavedRoutesSection(in contentView: NSView) {
         // Saved routes label
         let routesLabel = makeLabel("Saved routes:")
         routesLabel.frame = NSRect(x: 16, y: 318, width: 120, height: 20)
-        cv.addSubview(routesLabel)
+        contentView.addSubview(routesLabel)
 
         // "–" delete button aligned with the label
         let deleteBtn = NSButton(title: "–", target: self, action: #selector(deleteSelectedRoute))
         deleteBtn.bezelStyle = .smallSquare
         deleteBtn.frame = NSRect(x: 352, y: 314, width: 32, height: 24)
         deleteBtn.isEnabled = false
-        cv.addSubview(deleteBtn)
+        contentView.addSubview(deleteBtn)
         deleteRouteButton = deleteBtn
 
         // Saved routes table (single column, full-width)
@@ -128,80 +139,100 @@ final class PreferencesWindowController: NSWindowController {
         savedRoutesTable.action = #selector(savedRouteRowClicked)
         savedRoutesTable.target = self
         savedScrollView.documentView = savedRoutesTable
-        cv.addSubview(savedScrollView)
+        contentView.addSubview(savedScrollView)
+    }
 
+    private func setupNotificationsSection(in contentView: NSView) {
         // Notifications section separator
         let notifSeparator = NSBox()
         notifSeparator.boxType = .separator
         notifSeparator.frame = NSRect(x: 16, y: 226, width: 368, height: 1)
-        cv.addSubview(notifSeparator)
+        contentView.addSubview(notifSeparator)
 
         // Section label
         let notifLabel = makeLabel("Notifications")
         notifLabel.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
         notifLabel.frame = NSRect(x: 16, y: 206, width: 200, height: 18)
-        cv.addSubview(notifLabel)
+        contentView.addSubview(notifLabel)
 
         // Departure reminder row
-        departureReminderCheckbox = NSButton(checkboxWithTitle: "Departure reminder", target: self, action: #selector(notifCheckboxChanged(_:)))
+        departureReminderCheckbox = NSButton(
+            checkboxWithTitle: "Departure reminder",
+            target: self,
+            action: #selector(notifCheckboxChanged(_:))
+        )
         departureReminderCheckbox.frame = NSRect(x: 16, y: 180, width: 170, height: 20)
         departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
-        cv.addSubview(departureReminderCheckbox)
+        contentView.addSubview(departureReminderCheckbox)
 
         departureReminderField = makeNumberField()
         departureReminderField.frame = NSRect(x: 192, y: 180, width: 40, height: 20)
         departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
         departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
-        cv.addSubview(departureReminderField)
+        contentView.addSubview(departureReminderField)
 
         let depMinLabel = makeLabel("minutes before")
         depMinLabel.frame = NSRect(x: 238, y: 180, width: 120, height: 20)
-        cv.addSubview(depMinLabel)
+        contentView.addSubview(depMinLabel)
 
         // Delay alert row
-        delayAlertCheckbox = NSButton(checkboxWithTitle: "Delay alert when", target: self, action: #selector(notifCheckboxChanged(_:)))
+        delayAlertCheckbox = NSButton(
+            checkboxWithTitle: "Delay alert when",
+            target: self,
+            action: #selector(notifCheckboxChanged(_:))
+        )
         delayAlertCheckbox.frame = NSRect(x: 16, y: 152, width: 160, height: 20)
         delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
-        cv.addSubview(delayAlertCheckbox)
+        contentView.addSubview(delayAlertCheckbox)
 
         delayAlertField = makeNumberField()
         delayAlertField.frame = NSRect(x: 192, y: 152, width: 40, height: 20)
         delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
         delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
-        cv.addSubview(delayAlertField)
+        contentView.addSubview(delayAlertField)
 
         let delayMinLabel = makeLabel("+ minutes late")
         delayMinLabel.frame = NSRect(x: 238, y: 152, width: 120, height: 20)
-        cv.addSubview(delayMinLabel)
+        contentView.addSubview(delayMinLabel)
 
         // Platform change row
-        platformChangeCheckbox = NSButton(checkboxWithTitle: "Platform change alert", target: self, action: #selector(notifCheckboxChanged(_:)))
+        platformChangeCheckbox = NSButton(
+            checkboxWithTitle: "Platform change alert",
+            target: self,
+            action: #selector(notifCheckboxChanged(_:))
+        )
         platformChangeCheckbox.frame = NSRect(x: 16, y: 124, width: 220, height: 20)
         platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
-        cv.addSubview(platformChangeCheckbox)
+        contentView.addSubview(platformChangeCheckbox)
+    }
 
+    private func setupBottomButtons(in contentView: NSView) {
         // Save & Close button
         let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
         saveBtn.bezelStyle = .rounded
         saveBtn.frame = NSRect(x: 284, y: 78, width: 100, height: 28)
-        cv.addSubview(saveBtn)
+        contentView.addSubview(saveBtn)
 
         // Launch at Login checkbox
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: #selector(launchAtLoginChanged(_:)))
+        launchAtLoginCheckbox = NSButton(
+            checkboxWithTitle: "Launch at Login",
+            target: self,
+            action: #selector(launchAtLoginChanged(_:))
+        )
         launchAtLoginCheckbox.frame = NSRect(x: 16, y: 46, width: 200, height: 20)
         launchAtLoginCheckbox.state = loginItemController.isEnabled ? .on : .off
-        cv.addSubview(launchAtLoginCheckbox)
+        contentView.addSubview(launchAtLoginCheckbox)
 
         // Export / Import config buttons
         let exportBtn = NSButton(title: "Export Config…", target: self, action: #selector(exportConfig))
         exportBtn.bezelStyle = .rounded
         exportBtn.frame = NSRect(x: 16, y: 8, width: 150, height: 28)
-        cv.addSubview(exportBtn)
+        contentView.addSubview(exportBtn)
 
         let importBtn = NSButton(title: "Import Config…", target: self, action: #selector(importConfig))
         importBtn.bezelStyle = .rounded
         importBtn.frame = NSRect(x: 174, y: 8, width: 150, height: 28)
-        cv.addSubview(importBtn)
+        contentView.addSubview(importBtn)
     }
 
     // MARK: - Debounced search
@@ -232,147 +263,6 @@ final class PreferencesWindowController: NSWindowController {
         resultsScrollView.isHidden = searchResults.isEmpty
     }
 
-    // MARK: - Actions
-
-    @objc private func resultRowClicked() {
-        let row = resultsTable.clickedRow
-        guard row >= 0, row < searchResults.count else { return }
-        let location = searchResults[row]
-        let station = Station(name: location.name, id: location.id)
-        switch activeField {
-        case .from:
-            pendingFrom = station
-            fromField.stringValue = station.name
-        case .to:
-            pendingTo = station
-            toField.stringValue = station.name
-        case .none:
-            break
-        }
-        searchResults = []
-        resultsTable.reloadData()
-        resultsScrollView.isHidden = true
-        activeField = .none
-    }
-
-    @objc private func savedRouteRowClicked() {
-        let row = savedRoutesTable.clickedRow
-        guard row >= 0, row < savedRoutes.count else { return }
-        let route = savedRoutes[row]
-        pendingFrom = route.from
-        pendingTo = route.to
-        fromField.stringValue = route.from.name
-        toField.stringValue = route.to.name
-        searchResults = []
-        resultsTable.reloadData()
-        resultsScrollView.isHidden = true
-        activeField = .none
-    }
-
-    @objc private func deleteSelectedRoute() {
-        let row = savedRoutesTable.selectedRow
-        guard row >= 0, row < savedRoutes.count else { return }
-        savedRoutes.remove(at: row)
-        savedRoutesTable.reloadData()
-        deleteRouteButton.isEnabled = savedRoutesTable.selectedRow >= 0
-    }
-
-    @objc private func notifCheckboxChanged(_ sender: NSButton) {
-        departureReminderField.isEnabled = departureReminderCheckbox.state == .on
-        delayAlertField.isEnabled = delayAlertCheckbox.state == .on
-    }
-
-    @objc private func saveAndClose() {
-        var config = AppConfigStore.shared.load()
-        let stationsChanged = config.fromStation != pendingFrom || config.toStation != pendingTo
-        config.fromStation = pendingFrom
-        config.toStation = pendingTo
-        var routes = savedRoutes
-        if let f = pendingFrom, let t = pendingTo {
-            let route = SavedRoute(from: f, to: t)
-            if !routes.contains(route) {
-                routes.append(route)
-            }
-        }
-        config.savedRoutes = routes
-        if stationsChanged { config.trainNumber = nil }
-        config.notifications = NotificationSettings(
-            departureReminderEnabled: departureReminderCheckbox.state == .on,
-            departureReminderMinutes: max(1, departureReminderField.integerValue),
-            delayAlertEnabled: delayAlertCheckbox.state == .on,
-            delayAlertThresholdMinutes: max(1, delayAlertField.integerValue),
-            platformChangeEnabled: platformChangeCheckbox.state == .on
-        )
-        AppConfigStore.shared.save(config)
-        close()
-    }
-
-    @objc private func launchAtLoginChanged(_ sender: NSButton) {
-        let wantsEnabled = sender.state == .on
-        guard loginItemController.setEnabled(wantsEnabled) else {
-            sender.state = wantsEnabled ? .off : .on
-            showAlert(
-                title: "Couldn't update login item",
-                message: "macOS declined to \(wantsEnabled ? "register" : "unregister") TrainTracker as a login item."
-            )
-            return
-        }
-    }
-
-    @objc private func exportConfig() {
-        let config = AppConfigStore.shared.load()
-        guard let data = try? ConfigTransfer.exportData(config) else {
-            showAlert(title: "Export failed", message: "Couldn't encode the current configuration.")
-            return
-        }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "traintracker-config.json"
-        panel.allowedContentTypes = [.json]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try data.write(to: url)
-        } catch {
-            showAlert(title: "Export failed", message: error.localizedDescription)
-        }
-    }
-
-    @objc private func importConfig() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            let config = try ConfigTransfer.importConfig(from: data)
-            AppConfigStore.shared.save(config)
-            loadCurrentConfig()
-            refreshFieldsFromLoadedConfig()
-        } catch {
-            showAlert(title: "Import failed", message: "Couldn't read that file as a valid TrainTracker config.")
-        }
-    }
-
-    private func refreshFieldsFromLoadedConfig() {
-        fromField.stringValue = pendingFrom?.name ?? ""
-        toField.stringValue = pendingTo?.name ?? ""
-        savedRoutesTable.reloadData()
-        departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
-        departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
-        departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
-        delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
-        delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
-        delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
-        platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
-    }
-
-    private func showAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.runModal()
-    }
-
     @MainActor override func close() {
         super.close()
         onClose?()
@@ -381,30 +271,30 @@ final class PreferencesWindowController: NSWindowController {
     // MARK: - UI helpers
 
     private func makeLabel(_ text: String) -> NSTextField {
-        let f = NSTextField(labelWithString: text)
-        f.font = NSFont.systemFont(ofSize: 13)
-        return f
+        let field = NSTextField(labelWithString: text)
+        field.font = NSFont.systemFont(ofSize: 13)
+        return field
     }
 
     private func makeTextField(placeholder: String) -> NSTextField {
-        let f = NSTextField()
-        f.placeholderString = placeholder
-        f.font = NSFont.systemFont(ofSize: 13)
-        f.bezelStyle = .roundedBezel
-        return f
+        let field = NSTextField()
+        field.placeholderString = placeholder
+        field.font = NSFont.systemFont(ofSize: 13)
+        field.bezelStyle = .roundedBezel
+        return field
     }
 
     private func makeNumberField() -> NSTextField {
-        let f = NSTextField()
-        f.font = NSFont.systemFont(ofSize: 13)
-        f.bezelStyle = .roundedBezel
-        f.alignment = .center
+        let field = NSTextField()
+        field.font = NSFont.systemFont(ofSize: 13)
+        field.bezelStyle = .roundedBezel
+        field.alignment = .center
         let formatter = NumberFormatter()
         formatter.numberStyle = .none
         formatter.minimum = 1
         formatter.maximum = 120
-        f.formatter = formatter
-        return f
+        field.formatter = formatter
+        return field
     }
 }
 
@@ -413,8 +303,11 @@ final class PreferencesWindowController: NSWindowController {
 extension PreferencesWindowController: NSTextFieldDelegate {
     func controlTextDidBeginEditing(_ obj: Notification) {
         guard let field = obj.object as? NSTextField else { return }
-        if field === fromField { activeField = .from }
-        else if field === toField { activeField = .to }
+        if field === fromField {
+            activeField = .from
+        } else if field === toField {
+            activeField = .destination
+        }
     }
 
     func controlTextDidChange(_ obj: Notification) {

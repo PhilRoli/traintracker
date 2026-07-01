@@ -14,11 +14,11 @@ final class NotificationManager {
     private let scheduler: NotificationScheduler
     private var authRequested = false
 
-    private var trackedTrainKey: String? = nil
+    private var trackedTrainKey: String?
     private var lastDelaySecs: Int = 0
-    private var lastDeparturePlatform: String? = nil
-    private var lastArrivalPlatform: String? = nil
-    private var departureReminderSentFor: String? = nil
+    private var lastDeparturePlatform: String?
+    private var lastArrivalPlatform: String?
+    private var departureReminderSentFor: String?
 
     init(scheduler: NotificationScheduler = UNUserNotificationCenter.current()) {
         self.scheduler = scheduler

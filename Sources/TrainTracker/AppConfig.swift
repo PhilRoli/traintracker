@@ -8,9 +8,14 @@ struct Station: Codable, Equatable {
 
 struct SavedRoute: Codable, Equatable {
     var from: Station
-    var to: Station
+    var toStation: Station
 
-    var displayName: String { "\(from.name) → \(to.name)" }
+    private enum CodingKeys: String, CodingKey {
+        case from
+        case toStation = "to"
+    }
+
+    var displayName: String { "\(from.name) → \(toStation.name)" }
 }
 
 struct NotificationSettings: Codable {
@@ -44,7 +49,10 @@ struct AppConfig: Codable {
         toStation = try container.decodeIfPresent(Station.self, forKey: .toStation)
         trainNumber = try container.decodeIfPresent(String.self, forKey: .trainNumber)
         savedRoutes = try container.decode([SavedRoute].self, forKey: .savedRoutes)
-        notifications = try container.decodeIfPresent(NotificationSettings.self, forKey: .notifications) ?? NotificationSettings()
+        notifications = try container.decodeIfPresent(
+            NotificationSettings.self,
+            forKey: .notifications
+        ) ?? NotificationSettings()
     }
 
     func encode(to encoder: any Encoder) throws {

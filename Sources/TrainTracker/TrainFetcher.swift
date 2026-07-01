@@ -18,37 +18,37 @@ final class TrainFetcher {
     // MARK: - Main entry point
 
     func fetch(config: AppConfig) async -> TrainStatus {
-        guard let from = config.fromStation, let to = config.toStation else {
+        guard let from = config.fromStation, let destination = config.toStation else {
             invalidateCache()
             return .noConfig
         }
 
         let now = Date()
-        let configKey = "\(from.id)|\(to.id)|\(config.trainNumber ?? "")"
+        let configKey = "\(from.id)|\(destination.id)|\(config.trainNumber ?? "")"
         if configKey != cachedConfigKey {
             invalidateCache()
             cachedConfigKey = configKey
         }
 
         if let token = cachedRefreshToken, let trainNumber = config.trainNumber {
-            if let td = await tryRefresh(token: token, trainNumber: trainNumber, now: now) {
-                return .tracking(td, cachedOptions)
+            if let trainData = await tryRefresh(token: token, trainNumber: trainNumber, now: now) {
+                return .tracking(trainData, cachedOptions)
             }
             // tryRefresh cleared the token on failure; fall through to full fetch
         }
 
-        let journeys = await fetchAllJourneys(fromId: from.id, toId: to.id, now: now)
+        let journeys = await fetchAllJourneys(fromId: from.id, toId: destination.id, now: now)
         let options = buildOptions(from: journeys)
         cachedOptions = options
 
         guard let trainNumber = config.trainNumber else {
             return .pickTrain(options)
         }
-        guard let (td, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
+        guard let (trainData, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
             return .error("\(trainNumber) not found — use Switch Train to reselect", options)
         }
-        if let t = token { cachedRefreshToken = t }
-        return .tracking(td, options)
+        if let newToken = token { cachedRefreshToken = newToken }
+        return .tracking(trainData, options)
     }
 
     private func tryRefresh(token: String, trainNumber: String, now: Date) async -> TrainData? {
@@ -57,20 +57,24 @@ final class TrainFetcher {
             return nil
         }
         guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
-              let td = buildTrainData(leg: leg, now: now)
+              let trainData = buildTrainData(leg: leg, now: now)
         else {
             cachedRefreshToken = nil
             return nil
         }
         cachedRefreshToken = journey.refreshToken ?? token
-        return td
+        return trainData
     }
 
-    private func findTrainWithToken(named trainNumber: String, in journeys: [APIJourney], now: Date) -> (TrainData, String?)? {
+    private func findTrainWithToken(
+        named trainNumber: String,
+        in journeys: [APIJourney],
+        now: Date
+    ) -> (TrainData, String?)? {
         for journey in journeys {
             guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
-                  let td = buildTrainData(leg: leg, now: now) else { continue }
-            return (td, journey.refreshToken)
+                  let trainData = buildTrainData(leg: leg, now: now) else { continue }
+            return (trainData, journey.refreshToken)
         }
         return nil
     }
@@ -178,31 +182,31 @@ final class TrainFetcher {
         let middle = Array(stopovers.dropFirst().dropLast())
 
         // Find the index of the first upcoming stop
-        let nextIdx = middle.firstIndex { sv in
-            let t = Self.parseDate(sv.arrival ?? sv.plannedArrival)
-                    ?? Self.parseDate(sv.departure ?? sv.plannedDeparture)
-            return (t ?? .distantPast) > now
+        let nextIdx = middle.firstIndex { stopover in
+            let stopoverTime = Self.parseDate(stopover.arrival ?? stopover.plannedArrival)
+                    ?? Self.parseDate(stopover.departure ?? stopover.plannedDeparture)
+            return (stopoverTime ?? .distantPast) > now
         }
 
-        return middle.enumerated().map { (i, sv) in
+        return middle.enumerated().map { (idx, stopover) in
             StopoverInfo(
-                name: sv.stop.name,
-                scheduledArrival: Self.parseDate(sv.plannedArrival ?? sv.arrival),
-                arrivalDelaySecs: sv.arrivalDelay ?? sv.departureDelay ?? 0,
-                passed: nextIdx.map { i < $0 } ?? true,
-                isNext: nextIdx == i
+                name: stopover.stop.name,
+                scheduledArrival: Self.parseDate(stopover.plannedArrival ?? stopover.arrival),
+                arrivalDelaySecs: stopover.arrivalDelay ?? stopover.departureDelay ?? 0,
+                passed: nextIdx.map { idx < $0 } ?? true,
+                isNext: nextIdx == idx
             )
         }
     }
 
     // MARK: - Date parsing
 
-    static func parseDate(_ s: String?) -> Date? {
-        guard let s, !s.isEmpty else { return nil }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.date(from: s)
+    static func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString, !dateString.isEmpty else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: dateString) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: dateString)
     }
 }
