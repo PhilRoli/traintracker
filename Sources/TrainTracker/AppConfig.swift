@@ -96,4 +96,8 @@ final class AppConfigStore {
             defaults.removeObject(forKey: "statusLine")
         }
     }
+
+    func statusLine() -> String? {
+        defaults.string(forKey: "statusLine")
+    }
 }
