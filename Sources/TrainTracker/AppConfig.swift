@@ -19,11 +19,52 @@ struct SavedRoute: Codable, Equatable {
 }
 
 struct NotificationSettings: Codable {
-    var departureReminderEnabled: Bool  = true
-    var departureReminderMinutes: Int   = 10
-    var delayAlertEnabled: Bool         = true
-    var delayAlertThresholdMinutes: Int = 10
-    var platformChangeEnabled: Bool     = true
+    var departureReminderEnabled: Bool
+    var departureReminderMinutes: Int
+    var delayAlertEnabled: Bool
+    var delayAlertThresholdMinutes: Int
+    var platformChangeEnabled: Bool
+    var arrivalReminderEnabled: Bool
+    var arrivalReminderMinutes: Int
+
+    init(
+        departureReminderEnabled: Bool = true,
+        departureReminderMinutes: Int = 10,
+        delayAlertEnabled: Bool = true,
+        delayAlertThresholdMinutes: Int = 10,
+        platformChangeEnabled: Bool = true,
+        arrivalReminderEnabled: Bool = true,
+        arrivalReminderMinutes: Int = 10
+    ) {
+        self.departureReminderEnabled = departureReminderEnabled
+        self.departureReminderMinutes = departureReminderMinutes
+        self.delayAlertEnabled = delayAlertEnabled
+        self.delayAlertThresholdMinutes = delayAlertThresholdMinutes
+        self.platformChangeEnabled = platformChangeEnabled
+        self.arrivalReminderEnabled = arrivalReminderEnabled
+        self.arrivalReminderMinutes = arrivalReminderMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case departureReminderEnabled
+        case departureReminderMinutes
+        case delayAlertEnabled
+        case delayAlertThresholdMinutes
+        case platformChangeEnabled
+        case arrivalReminderEnabled
+        case arrivalReminderMinutes
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        departureReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .departureReminderEnabled) ?? true
+        departureReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .departureReminderMinutes) ?? 10
+        delayAlertEnabled = try container.decodeIfPresent(Bool.self, forKey: .delayAlertEnabled) ?? true
+        delayAlertThresholdMinutes = try container.decodeIfPresent(Int.self, forKey: .delayAlertThresholdMinutes) ?? 10
+        platformChangeEnabled = try container.decodeIfPresent(Bool.self, forKey: .platformChangeEnabled) ?? true
+        arrivalReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .arrivalReminderEnabled) ?? true
+        arrivalReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .arrivalReminderMinutes) ?? 10
+    }
 }
 
 struct AppConfig: Codable {

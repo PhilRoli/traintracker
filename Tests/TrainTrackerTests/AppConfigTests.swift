@@ -59,6 +59,8 @@ final class AppConfigTests: XCTestCase {
         XCTAssertTrue(settings.delayAlertEnabled)
         XCTAssertEqual(settings.delayAlertThresholdMinutes, 10)
         XCTAssertTrue(settings.platformChangeEnabled)
+        XCTAssertTrue(settings.arrivalReminderEnabled)
+        XCTAssertEqual(settings.arrivalReminderMinutes, 10)
     }
 
     func test_notificationSettings_roundtrip() throws {
@@ -73,6 +75,18 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(decoded.departureReminderMinutes, 7)
         XCTAssertEqual(decoded.delayAlertThresholdMinutes, 15)
         XCTAssertFalse(decoded.platformChangeEnabled)
+    }
+
+    func test_notificationSettings_decodesMissingArrivalKeys() throws {
+        // Simulates a NotificationSettings blob saved before the arrival reminder fields existed.
+        let legacyJSON = """
+        {"departureReminderEnabled":true,"departureReminderMinutes":10,
+         "delayAlertEnabled":true,"delayAlertThresholdMinutes":10,
+         "platformChangeEnabled":true}
+        """
+        let decoded = try JSONDecoder().decode(NotificationSettings.self, from: Data(legacyJSON.utf8))
+        XCTAssertTrue(decoded.arrivalReminderEnabled)
+        XCTAssertEqual(decoded.arrivalReminderMinutes, 10)
     }
 
     func test_appConfig_notificationsDefaultsOnMissingKey() throws {
