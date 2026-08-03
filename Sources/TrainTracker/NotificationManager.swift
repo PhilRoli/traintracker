@@ -19,6 +19,7 @@ final class NotificationManager {
     private var lastDeparturePlatform: String?
     private var lastArrivalPlatform: String?
     private var departureReminderSentFor: String?
+    private var arrivalReminderSentFor: String?
 
     init(scheduler: NotificationScheduler = UNUserNotificationCenter.current()) {
         self.scheduler = scheduler
@@ -34,9 +35,11 @@ final class NotificationManager {
             lastDeparturePlatform = nil
             lastArrivalPlatform = nil
             departureReminderSentFor = nil
+            arrivalReminderSentFor = nil
         }
 
         processDepartureReminder(data: data, settings: settings, key: key)
+        processArrivalReminder(data: data, settings: settings, key: key)
         processDelayAlert(data: data, settings: settings, key: key)
         processPlatformChange(data: data, settings: settings, key: key)
     }
@@ -66,6 +69,24 @@ final class NotificationManager {
 
         post(identifier: "departure-\(key)", content: content)
         departureReminderSentFor = key
+    }
+
+    private func processArrivalReminder(data: TrainData, settings: NotificationSettings, key: String) {
+        guard settings.arrivalReminderEnabled, arrivalReminderSentFor != key else { return }
+
+        let rtArr = data.scheduledArrival.addingTimeInterval(TimeInterval(data.arrivalDelaySecs))
+        let secsUntil = rtArr.timeIntervalSinceNow
+        guard secsUntil > 0, secsUntil <= Double(settings.arrivalReminderMinutes * 60) else { return }
+
+        let content = UNMutableNotificationContent()
+        let minsLeft = max(1, Int(secsUntil / 60))
+        content.title = "\(data.trainName) arrives in \(minsLeft)m"
+        content.body = data.arrivalPlatform
+            .map { "Platform \($0) at \(data.toName)" }
+            ?? "At \(data.toName)"
+
+        post(identifier: "arrival-\(key)", content: content)
+        arrivalReminderSentFor = key
     }
 
     private func processDelayAlert(data: TrainData, settings: NotificationSettings, key: String) {
