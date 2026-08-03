@@ -51,6 +51,7 @@ extension PreferencesWindowController {
     @objc func notifCheckboxChanged(_ sender: NSButton) {
         departureReminderField.isEnabled = departureReminderCheckbox.state == .on
         delayAlertField.isEnabled = delayAlertCheckbox.state == .on
+        arrivalReminderField.isEnabled = arrivalReminderCheckbox.state == .on
     }
 
     @objc func saveAndClose() {
@@ -72,7 +73,9 @@ extension PreferencesWindowController {
             departureReminderMinutes: max(1, departureReminderField.integerValue),
             delayAlertEnabled: delayAlertCheckbox.state == .on,
             delayAlertThresholdMinutes: max(1, delayAlertField.integerValue),
-            platformChangeEnabled: platformChangeCheckbox.state == .on
+            platformChangeEnabled: platformChangeCheckbox.state == .on,
+            arrivalReminderEnabled: arrivalReminderCheckbox.state == .on,
+            arrivalReminderMinutes: max(1, arrivalReminderField.integerValue)
         )
         AppConfigStore.shared.save(config)
         close()
@@ -134,6 +137,9 @@ extension PreferencesWindowController {
         delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
         delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
         platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
+        arrivalReminderCheckbox.state = pendingNotifications.arrivalReminderEnabled ? .on : .off
+        arrivalReminderField.integerValue = pendingNotifications.arrivalReminderMinutes
+        arrivalReminderField.isEnabled = pendingNotifications.arrivalReminderEnabled
     }
 
     private func showAlert(title: String, message: String) {
