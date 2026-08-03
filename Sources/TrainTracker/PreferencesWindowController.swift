@@ -87,6 +87,14 @@ final class PreferencesWindowController: NSWindowController {
         for section in sections {
             mainStack.addArrangedSubview(section)
             section.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+            // Without this, NSStackView can silently set isHidden = true on whichever
+            // arranged subview it picks when the stack can't fit everything at the
+            // window's minimum size — and it does NOT un-hide the view later even if
+            // the window is resized back up. Pinning every top-level section to
+            // .mustHold makes that auto-hide behavior impossible, so shrinking the
+            // window can only make the layout visually tight, never make a section
+            // vanish (permanently or otherwise).
+            mainStack.setVisibilityPriority(.mustHold, for: section)
         }
 
         setupResultsOverlay(in: contentView)
