@@ -25,45 +25,46 @@ final class NotificationSpy: NotificationScheduler {
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool { true }
 }
 
+// MARK: - Shared test helpers (also used by NotificationManagerArrivalReminderTests)
+
+@MainActor
+func makeManager() -> (NotificationManager, NotificationSpy) {
+    let spy = NotificationSpy()
+    let manager = NotificationManager(scheduler: spy)
+    return (manager, spy)
+}
+
+func makeTrainData(
+    trainName: String = "WB 912",
+    fromName: String = "Linz/Donau Hbf",
+    toName: String = "Salzburg Hbf",
+    scheduledDeparture: Date = Date().addingTimeInterval(3600),
+    scheduledArrival: Date = Date().addingTimeInterval(7200),
+    departureDelaySecs: Int = 0,
+    arrivalDelaySecs: Int = 0,
+    departurePlatform: String? = nil,
+    arrivalPlatform: String? = nil,
+    isEnRoute: Bool = false
+) -> TrainData {
+    TrainData(
+        trainName: trainName,
+        fromName: fromName,
+        toName: toName,
+        scheduledDeparture: scheduledDeparture,
+        scheduledArrival: scheduledArrival,
+        departureDelaySecs: departureDelaySecs,
+        arrivalDelaySecs: arrivalDelaySecs,
+        departurePlatform: departurePlatform,
+        arrivalPlatform: arrivalPlatform,
+        stopovers: [],
+        isEnRoute: isEnRoute
+    )
+}
+
 // MARK: - Tests
 
 @MainActor
 final class NotificationManagerTests: XCTestCase {
-
-    // MARK: - Helpers
-
-    func makeManager() -> (NotificationManager, NotificationSpy) {
-        let spy = NotificationSpy()
-        let manager = NotificationManager(scheduler: spy)
-        return (manager, spy)
-    }
-
-    func makeTrainData(
-        trainName: String = "WB 912",
-        fromName: String = "Linz/Donau Hbf",
-        toName: String = "Salzburg Hbf",
-        scheduledDeparture: Date = Date().addingTimeInterval(3600),
-        scheduledArrival: Date = Date().addingTimeInterval(7200),
-        departureDelaySecs: Int = 0,
-        arrivalDelaySecs: Int = 0,
-        departurePlatform: String? = nil,
-        arrivalPlatform: String? = nil,
-        isEnRoute: Bool = false
-    ) -> TrainData {
-        TrainData(
-            trainName: trainName,
-            fromName: fromName,
-            toName: toName,
-            scheduledDeparture: scheduledDeparture,
-            scheduledArrival: scheduledArrival,
-            departureDelaySecs: departureDelaySecs,
-            arrivalDelaySecs: arrivalDelaySecs,
-            departurePlatform: departurePlatform,
-            arrivalPlatform: arrivalPlatform,
-            stopovers: [],
-            isEnRoute: isEnRoute
-        )
-    }
 
     // MARK: - Departure reminder
 
@@ -214,114 +215,6 @@ final class NotificationManagerTests: XCTestCase {
                                        arrivalDelaySecs: 15 * 60, isEnRoute: true), settings: settings)
 
         XCTAssertEqual(spy.posted.count, 0)
-    }
-
-    // MARK: - Arrival reminder
-
-    func test_arrivalReminder_firesWhenWithinWindow() {
-        let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderMinutes = 10
-
-        // Train arrives in 8 minutes (within 10m window)
-        let data = makeTrainData(
-            scheduledArrival: Date().addingTimeInterval(8 * 60),
-            isEnRoute: true
-        )
-
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 1)
-        XCTAssertTrue(spy.posted[0].identifier.hasPrefix("arrival-"))
-        XCTAssertTrue(spy.posted[0].title.contains("WB 912"))
-        XCTAssertTrue(spy.posted[0].title.contains("arrives"))
-    }
-
-    func test_arrivalReminder_doesNotFireOutsideWindow() {
-        let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderMinutes = 10
-
-        let data = makeTrainData(
-            scheduledArrival: Date().addingTimeInterval(15 * 60),
-            isEnRoute: true
-        )
-
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 0)
-    }
-
-    func test_arrivalReminder_doesNotFireTwiceForSameTrain() {
-        let (manager, spy) = makeManager()
-        let settings = NotificationSettings()
-        let arrival = Date().addingTimeInterval(5 * 60)
-        let data = makeTrainData(scheduledArrival: arrival, isEnRoute: true)
-
-        manager.process(data, settings: settings)
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 1)
-    }
-
-    func test_arrivalReminder_doesNotFireWhenDisabled() {
-        let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
-
-        let data = makeTrainData(
-            scheduledArrival: Date().addingTimeInterval(5 * 60),
-            isEnRoute: true
-        )
-
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 0)
-    }
-
-    func test_arrivalReminder_includesPlatformInBodyWhenAvailable() {
-        let (manager, spy) = makeManager()
-        let settings = NotificationSettings()
-
-        let data = makeTrainData(
-            scheduledArrival: Date().addingTimeInterval(5 * 60),
-            arrivalPlatform: "7",
-            isEnRoute: true
-        )
-
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 1)
-        XCTAssertTrue(spy.posted[0].body.contains("7"))
-    }
-
-    func test_arrivalReminder_fallsBackToStationNameWhenPlatformUnknown() {
-        let (manager, spy) = makeManager()
-        let settings = NotificationSettings()
-
-        let data = makeTrainData(
-            scheduledArrival: Date().addingTimeInterval(5 * 60),
-            arrivalPlatform: nil,
-            isEnRoute: true
-        )
-
-        manager.process(data, settings: settings)
-
-        XCTAssertEqual(spy.posted.count, 1)
-        XCTAssertTrue(spy.posted[0].body.contains("Salzburg Hbf"))
-    }
-
-    func test_stateReset_arrivalReminderCanFireAgainForNewTrain() {
-        let (manager, spy) = makeManager()
-        let settings = NotificationSettings()
-
-        let arr1 = Date().addingTimeInterval(5 * 60)
-        manager.process(makeTrainData(trainName: "WB 912", scheduledArrival: arr1, isEnRoute: true), settings: settings)
-        XCTAssertEqual(spy.posted.count, 1)
-
-        let arr2 = Date().addingTimeInterval(7 * 60)
-        manager.process(makeTrainData(trainName: "WB 914", scheduledArrival: arr2, isEnRoute: true), settings: settings)
-        XCTAssertEqual(spy.posted.count, 2)
     }
 
     // MARK: - Platform change
