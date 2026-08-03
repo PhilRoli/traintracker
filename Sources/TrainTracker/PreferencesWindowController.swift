@@ -29,19 +29,22 @@ final class PreferencesWindowController: NSWindowController {
     var delayAlertCheckbox: NSButton!
     var delayAlertField: NSTextField!
     var platformChangeCheckbox: NSButton!
+    var arrivalReminderCheckbox: NSButton!
+    var arrivalReminderField: NSTextField!
     var pendingNotifications: NotificationSettings = NotificationSettings()
 
     enum ActiveField { case from, destination, none }
 
     convenience init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 510),
-            styleMask: [.titled, .closable, .nonactivatingPanel],
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 620),
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.title = "Train Tracker"
         panel.isReleasedWhenClosed = false
+        panel.minSize = NSSize(width: 420, height: 560)
         panel.center()
         self.init(window: panel)
         loadCurrentConfig()
@@ -56,44 +59,77 @@ final class PreferencesWindowController: NSWindowController {
         pendingNotifications = config.notifications
     }
 
+    // MARK: - Layout
+
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-        setupFromToFields(in: contentView)
-        setupResultsTable(in: contentView)
-        setupSavedRoutesSection(in: contentView)
-        setupNotificationsSection(in: contentView)
-        setupBottomButtons(in: contentView)
+
+        let mainStack = NSStackView()
+        mainStack.orientation = .vertical
+        mainStack.alignment = .leading
+        mainStack.spacing = 20
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(mainStack)
+
+        NSLayoutConstraint.activate([
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+        ])
+
+        let sections = [
+            makeRouteSection(),
+            makeSavedRoutesSection(),
+            makeNotificationsSection(),
+            makeAppSection()
+        ]
+        for section in sections {
+            mainStack.addArrangedSubview(section)
+            section.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+        }
+
+        setupResultsOverlay(in: contentView)
     }
 
-    private func setupFromToFields(in contentView: NSView) {
-        // From row
-        let fromLabel = makeLabel("From:")
-        fromLabel.frame = NSRect(x: 16, y: 462, width: 50, height: 20)
-        contentView.addSubview(fromLabel)
-
-        fromField = makeTextField(placeholder: "Search for station…")
-        fromField.frame = NSRect(x: 70, y: 458, width: 314, height: 24)
+    private func makeRouteSection() -> NSView {
+        let fromField = makeTextField(placeholder: "Search for station…")
         fromField.stringValue = pendingFrom?.name ?? ""
         fromField.delegate = self
-        contentView.addSubview(fromField)
+        self.fromField = fromField
+        let fromRow = makeLabeledFieldRow(label: "From:", field: fromField)
 
-        // To row
-        let toLabel = makeLabel("To:")
-        toLabel.frame = NSRect(x: 16, y: 430, width: 50, height: 20)
-        contentView.addSubview(toLabel)
-
-        toField = makeTextField(placeholder: "Search for station…")
-        toField.frame = NSRect(x: 70, y: 426, width: 314, height: 24)
+        let toField = makeTextField(placeholder: "Search for station…")
         toField.stringValue = pendingTo?.name ?? ""
         toField.delegate = self
-        contentView.addSubview(toField)
+        self.toField = toField
+        let toRow = makeLabeledFieldRow(label: "To:", field: toField)
+
+        let section = NSStackView(views: [fromRow, toRow])
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 8
+        for row in [fromRow, toRow] {
+            row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        }
+        return section
     }
 
-    private func setupResultsTable(in contentView: NSView) {
-        // Search results table (hidden until there are results)
-        resultsScrollView = NSScrollView(frame: NSRect(x: 70, y: 342, width: 314, height: 76))
+    private func makeLabeledFieldRow(label text: String, field: NSTextField) -> NSView {
+        let label = makeLabel(text)
+        label.widthAnchor.constraint(equalToConstant: 50).isActive = true
+        let row = NSStackView(views: [label, field])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .centerY
+        return row
+    }
+
+    private func setupResultsOverlay(in contentView: NSView) {
+        resultsScrollView = NSScrollView()
         resultsScrollView.hasVerticalScroller = true
         resultsScrollView.borderType = .bezelBorder
+        resultsScrollView.translatesAutoresizingMaskIntoConstraints = false
         resultsTable = NSTableView()
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         col.title = "Station"
@@ -106,32 +142,38 @@ final class PreferencesWindowController: NSWindowController {
         resultsScrollView.documentView = resultsTable
         resultsScrollView.isHidden = true
         contentView.addSubview(resultsScrollView)
+
+        NSLayoutConstraint.activate([
+            resultsScrollView.topAnchor.constraint(equalTo: toField.bottomAnchor, constant: 4),
+            resultsScrollView.leadingAnchor.constraint(equalTo: toField.leadingAnchor),
+            resultsScrollView.trailingAnchor.constraint(equalTo: toField.trailingAnchor),
+            resultsScrollView.heightAnchor.constraint(equalToConstant: 76)
+        ])
     }
 
-    private func setupSavedRoutesSection(in contentView: NSView) {
-        // Saved routes label
-        let routesLabel = makeLabel("Saved routes:")
-        routesLabel.frame = NSRect(x: 16, y: 318, width: 120, height: 20)
-        contentView.addSubview(routesLabel)
-
-        // "–" delete button aligned with the label
+    private func makeSavedRoutesSection() -> NSView {
+        let label = makeSectionLabel("Saved routes")
         let deleteBtn = NSButton(title: "–", target: self, action: #selector(deleteSelectedRoute))
         deleteBtn.bezelStyle = .smallSquare
-        deleteBtn.frame = NSRect(x: 352, y: 314, width: 32, height: 24)
         deleteBtn.isEnabled = false
-        contentView.addSubview(deleteBtn)
         deleteRouteButton = deleteBtn
 
-        // Saved routes table (single column, full-width)
-        let savedScrollView = NSScrollView(frame: NSRect(x: 16, y: 234, width: 368, height: 76))
+        let spacer = NSView()
+        let headerRow = NSStackView(views: [label, spacer, deleteBtn])
+        headerRow.orientation = .horizontal
+        headerRow.distribution = .fill
+        label.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        deleteBtn.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+
+        let savedScrollView = NSScrollView()
         savedScrollView.hasVerticalScroller = true
         savedScrollView.borderType = .bezelBorder
+        savedScrollView.heightAnchor.constraint(equalToConstant: 90).isActive = true
         let deletable = DeletableTableView()
         deletable.onDelete = { [weak self] in self?.deleteSelectedRoute() }
         savedRoutesTable = deletable
         let nameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("route"))
         nameCol.title = "Route"
-        nameCol.width = 350
         savedRoutesTable.addTableColumn(nameCol)
         savedRoutesTable.headerView = nil
         savedRoutesTable.dataSource = self
@@ -139,100 +181,115 @@ final class PreferencesWindowController: NSWindowController {
         savedRoutesTable.action = #selector(savedRouteRowClicked)
         savedRoutesTable.target = self
         savedScrollView.documentView = savedRoutesTable
-        contentView.addSubview(savedScrollView)
+
+        let section = NSStackView(views: [makeSeparator(), headerRow, savedScrollView])
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 8
+        for view in [headerRow, savedScrollView] {
+            view.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        }
+        return section
     }
 
-    private func setupNotificationsSection(in contentView: NSView) {
-        // Notifications section separator
-        let notifSeparator = NSBox()
-        notifSeparator.boxType = .separator
-        notifSeparator.frame = NSRect(x: 16, y: 226, width: 368, height: 1)
-        contentView.addSubview(notifSeparator)
+    private func makeNotificationsSection() -> NSView {
+        let label = makeSectionLabel("Notifications")
 
-        // Section label
-        let notifLabel = makeLabel("Notifications")
-        notifLabel.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        notifLabel.frame = NSRect(x: 16, y: 206, width: 200, height: 18)
-        contentView.addSubview(notifLabel)
-
-        // Departure reminder row
         departureReminderCheckbox = NSButton(
             checkboxWithTitle: "Departure reminder",
-            target: self,
-            action: #selector(notifCheckboxChanged(_:))
+            target: self, action: #selector(notifCheckboxChanged(_:))
         )
-        departureReminderCheckbox.frame = NSRect(x: 16, y: 180, width: 170, height: 20)
         departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
-        contentView.addSubview(departureReminderCheckbox)
-
         departureReminderField = makeNumberField()
-        departureReminderField.frame = NSRect(x: 192, y: 180, width: 40, height: 20)
         departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
         departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
-        contentView.addSubview(departureReminderField)
+        let departureRow = makeNotificationRow(
+            checkbox: departureReminderCheckbox, field: departureReminderField, suffix: "minutes before"
+        )
 
-        let depMinLabel = makeLabel("minutes before")
-        depMinLabel.frame = NSRect(x: 238, y: 180, width: 120, height: 20)
-        contentView.addSubview(depMinLabel)
-
-        // Delay alert row
         delayAlertCheckbox = NSButton(
             checkboxWithTitle: "Delay alert when",
-            target: self,
-            action: #selector(notifCheckboxChanged(_:))
+            target: self, action: #selector(notifCheckboxChanged(_:))
         )
-        delayAlertCheckbox.frame = NSRect(x: 16, y: 152, width: 160, height: 20)
         delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
-        contentView.addSubview(delayAlertCheckbox)
-
         delayAlertField = makeNumberField()
-        delayAlertField.frame = NSRect(x: 192, y: 152, width: 40, height: 20)
         delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
         delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
-        contentView.addSubview(delayAlertField)
+        let delayRow = makeNotificationRow(
+            checkbox: delayAlertCheckbox, field: delayAlertField, suffix: "+ minutes late"
+        )
 
-        let delayMinLabel = makeLabel("+ minutes late")
-        delayMinLabel.frame = NSRect(x: 238, y: 152, width: 120, height: 20)
-        contentView.addSubview(delayMinLabel)
+        arrivalReminderCheckbox = NSButton(
+            checkboxWithTitle: "Arrival reminder",
+            target: self, action: #selector(notifCheckboxChanged(_:))
+        )
+        arrivalReminderCheckbox.state = pendingNotifications.arrivalReminderEnabled ? .on : .off
+        arrivalReminderField = makeNumberField()
+        arrivalReminderField.integerValue = pendingNotifications.arrivalReminderMinutes
+        arrivalReminderField.isEnabled = pendingNotifications.arrivalReminderEnabled
+        let arrivalRow = makeNotificationRow(
+            checkbox: arrivalReminderCheckbox, field: arrivalReminderField, suffix: "minutes before"
+        )
 
-        // Platform change row
         platformChangeCheckbox = NSButton(
             checkboxWithTitle: "Platform change alert",
-            target: self,
-            action: #selector(notifCheckboxChanged(_:))
+            target: self, action: #selector(notifCheckboxChanged(_:))
         )
-        platformChangeCheckbox.frame = NSRect(x: 16, y: 124, width: 220, height: 20)
         platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
-        contentView.addSubview(platformChangeCheckbox)
+
+        let section = NSStackView(views: [
+            makeSeparator(), label, departureRow, delayRow, arrivalRow, platformChangeCheckbox
+        ])
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 8
+        for row in [departureRow, delayRow, arrivalRow] {
+            row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        }
+        return section
     }
 
-    private func setupBottomButtons(in contentView: NSView) {
-        // Save & Close button
-        let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
-        saveBtn.bezelStyle = .rounded
-        saveBtn.frame = NSRect(x: 284, y: 78, width: 100, height: 28)
-        contentView.addSubview(saveBtn)
+    private func makeNotificationRow(checkbox: NSButton, field: NSTextField, suffix: String) -> NSView {
+        checkbox.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        checkbox.widthAnchor.constraint(equalToConstant: 170).isActive = true
+        field.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        let suffixLabel = makeLabel(suffix)
+        let row = NSStackView(views: [checkbox, field, suffixLabel])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .centerY
+        return row
+    }
 
-        // Launch at Login checkbox
+    private func makeAppSection() -> NSView {
         launchAtLoginCheckbox = NSButton(
             checkboxWithTitle: "Launch at Login",
-            target: self,
-            action: #selector(launchAtLoginChanged(_:))
+            target: self, action: #selector(launchAtLoginChanged(_:))
         )
-        launchAtLoginCheckbox.frame = NSRect(x: 16, y: 46, width: 200, height: 20)
         launchAtLoginCheckbox.state = loginItemController.isEnabled ? .on : .off
-        contentView.addSubview(launchAtLoginCheckbox)
 
-        // Export / Import config buttons
         let exportBtn = NSButton(title: "Export Config…", target: self, action: #selector(exportConfig))
         exportBtn.bezelStyle = .rounded
-        exportBtn.frame = NSRect(x: 16, y: 8, width: 150, height: 28)
-        contentView.addSubview(exportBtn)
-
         let importBtn = NSButton(title: "Import Config…", target: self, action: #selector(importConfig))
         importBtn.bezelStyle = .rounded
-        importBtn.frame = NSRect(x: 174, y: 8, width: 150, height: 28)
-        contentView.addSubview(importBtn)
+        let transferRow = NSStackView(views: [exportBtn, importBtn])
+        transferRow.orientation = .horizontal
+        transferRow.spacing = 8
+
+        let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
+        saveBtn.bezelStyle = .rounded
+        saveBtn.keyEquivalent = "\r"
+        let saveSpacer = NSView()
+        let saveRow = NSStackView(views: [saveSpacer, saveBtn])
+        saveRow.orientation = .horizontal
+        saveRow.distribution = .fill
+
+        let section = NSStackView(views: [makeSeparator(), launchAtLoginCheckbox, transferRow, saveRow])
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 10
+        saveRow.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        return section
     }
 
     // MARK: - Debounced search
@@ -274,6 +331,19 @@ final class PreferencesWindowController: NSWindowController {
         let field = NSTextField(labelWithString: text)
         field.font = NSFont.systemFont(ofSize: 13)
         return field
+    }
+
+    private func makeSectionLabel(_ text: String) -> NSTextField {
+        let label = makeLabel(text)
+        label.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    private func makeSeparator() -> NSBox {
+        let box = NSBox()
+        box.boxType = .separator
+        return box
     }
 
     private func makeTextField(placeholder: String) -> NSTextField {
