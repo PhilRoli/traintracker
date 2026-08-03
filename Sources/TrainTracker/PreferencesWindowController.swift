@@ -78,8 +78,14 @@ final class PreferencesWindowController: NSWindowController {
             mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
         ])
 
+        let routeSection = makeRouteSection()
+        // Resist growing vertically so extra window height goes to the Saved
+        // Routes table (which has a growth-friendly min-height constraint)
+        // rather than pooling as empty space below the To: field.
+        routeSection.setContentHuggingPriority(.defaultHigh, for: .vertical)
+
         let sections = [
-            makeRouteSection(),
+            routeSection,
             makeSavedRoutesSection(),
             makeNotificationsSection(),
             makeAppSection()
@@ -176,7 +182,7 @@ final class PreferencesWindowController: NSWindowController {
         let savedScrollView = NSScrollView()
         savedScrollView.hasVerticalScroller = true
         savedScrollView.borderType = .bezelBorder
-        savedScrollView.heightAnchor.constraint(equalToConstant: 90).isActive = true
+        savedScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 90).isActive = true
         let deletable = DeletableTableView()
         deletable.onDelete = { [weak self] in self?.deleteSelectedRoute() }
         savedRoutesTable = deletable
@@ -286,7 +292,6 @@ final class PreferencesWindowController: NSWindowController {
 
         let saveBtn = NSButton(title: "Save & Close", target: self, action: #selector(saveAndClose))
         saveBtn.bezelStyle = .rounded
-        saveBtn.keyEquivalent = "\r"
         let saveSpacer = NSView()
         let saveRow = NSStackView(views: [saveSpacer, saveBtn])
         saveRow.orientation = .horizontal
