@@ -115,4 +115,66 @@ final class AppConfigTests: XCTestCase {
         let value = UserDefaults(suiteName: store.suiteName)?.string(forKey: "statusLine")
         XCTAssertNil(value)
     }
+
+    func test_saveAndLoadRoundtrip_withViaAndSecondLeg() {
+        var config = AppConfig()
+        config.fromStation = Station(name: "Linz Hbf", id: "8100013")
+        config.viaStation = Station(name: "Wien Meidling", id: "8100523")
+        config.toStation = Station(name: "Wiener Neustadt Hbf", id: "8100108")
+        config.trainNumber = "RJX 60"
+        config.secondLegTrainNumber = "REX 1234"
+
+        store.save(config)
+        let loaded = store.load()
+
+        XCTAssertEqual(loaded.viaStation?.id, "8100523")
+        XCTAssertEqual(loaded.secondLegTrainNumber, "REX 1234")
+    }
+
+    func test_appConfig_viaFieldsDefaultNilOnLegacyConfig() throws {
+        // Simulate a stored config saved before via-routes existed (no viaStation/secondLegTrainNumber keys)
+        let legacyJSON = """
+        {"fromStation":{"name":"Linz/Donau Hbf","id":"8100013"},
+         "toStation":{"name":"Salzburg Hbf","id":"8100002"},
+         "trainNumber":"WB 912","savedRoutes":[]}
+        """
+        let config = try JSONDecoder().decode(AppConfig.self, from: Data(legacyJSON.utf8))
+        XCTAssertNil(config.viaStation)
+        XCTAssertNil(config.secondLegTrainNumber)
+    }
+
+    func test_savedRoute_displayName_includesVia() {
+        let route = SavedRoute(
+            from: Station(name: "Linz Hbf", id: "8100013"),
+            toStation: Station(name: "Wiener Neustadt Hbf", id: "8100108"),
+            viaStation: Station(name: "Wien Meidling", id: "8100523")
+        )
+        XCTAssertEqual(route.displayName, "Linz Hbf → Wien Meidling → Wiener Neustadt Hbf")
+    }
+
+    func test_savedRoute_displayName_withoutVia() {
+        let route = SavedRoute(
+            from: Station(name: "Linz Hbf", id: "8100013"),
+            toStation: Station(name: "Salzburg Hbf", id: "8100002")
+        )
+        XCTAssertEqual(route.displayName, "Linz Hbf → Salzburg Hbf")
+    }
+
+    func test_notificationSettings_defaultValues_includesTransferReminder() {
+        let settings = NotificationSettings()
+        XCTAssertTrue(settings.transferReminderEnabled)
+        XCTAssertEqual(settings.transferReminderMinutes, 10)
+    }
+
+    func test_notificationSettings_decodesMissingTransferKeys() throws {
+        // Simulates a NotificationSettings blob saved before the transfer reminder existed.
+        let legacyJSON = """
+        {"departureReminderEnabled":true,"departureReminderMinutes":10,
+         "delayAlertEnabled":true,"delayAlertThresholdMinutes":10,
+         "platformChangeEnabled":true,"arrivalReminderEnabled":true,"arrivalReminderMinutes":10}
+        """
+        let decoded = try JSONDecoder().decode(NotificationSettings.self, from: Data(legacyJSON.utf8))
+        XCTAssertTrue(decoded.transferReminderEnabled)
+        XCTAssertEqual(decoded.transferReminderMinutes, 10)
+    }
 }

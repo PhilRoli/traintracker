@@ -9,13 +9,20 @@ struct Station: Codable, Equatable {
 struct SavedRoute: Codable, Equatable {
     var from: Station
     var toStation: Station
+    var viaStation: Station?
 
     private enum CodingKeys: String, CodingKey {
         case from
         case toStation = "to"
+        case viaStation
     }
 
-    var displayName: String { "\(from.name) → \(toStation.name)" }
+    var displayName: String {
+        if let viaStation {
+            return "\(from.name) → \(viaStation.name) → \(toStation.name)"
+        }
+        return "\(from.name) → \(toStation.name)"
+    }
 }
 
 struct NotificationSettings: Codable {
@@ -26,6 +33,8 @@ struct NotificationSettings: Codable {
     var platformChangeEnabled: Bool
     var arrivalReminderEnabled: Bool
     var arrivalReminderMinutes: Int
+    var transferReminderEnabled: Bool
+    var transferReminderMinutes: Int
 
     init(
         departureReminderEnabled: Bool = true,
@@ -34,7 +43,9 @@ struct NotificationSettings: Codable {
         delayAlertThresholdMinutes: Int = 10,
         platformChangeEnabled: Bool = true,
         arrivalReminderEnabled: Bool = true,
-        arrivalReminderMinutes: Int = 10
+        arrivalReminderMinutes: Int = 10,
+        transferReminderEnabled: Bool = true,
+        transferReminderMinutes: Int = 10
     ) {
         self.departureReminderEnabled = departureReminderEnabled
         self.departureReminderMinutes = departureReminderMinutes
@@ -43,6 +54,8 @@ struct NotificationSettings: Codable {
         self.platformChangeEnabled = platformChangeEnabled
         self.arrivalReminderEnabled = arrivalReminderEnabled
         self.arrivalReminderMinutes = arrivalReminderMinutes
+        self.transferReminderEnabled = transferReminderEnabled
+        self.transferReminderMinutes = transferReminderMinutes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -53,6 +66,8 @@ struct NotificationSettings: Codable {
         case platformChangeEnabled
         case arrivalReminderEnabled
         case arrivalReminderMinutes
+        case transferReminderEnabled
+        case transferReminderMinutes
     }
 
     init(from decoder: any Decoder) throws {
@@ -64,13 +79,17 @@ struct NotificationSettings: Codable {
         platformChangeEnabled = try container.decodeIfPresent(Bool.self, forKey: .platformChangeEnabled) ?? true
         arrivalReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .arrivalReminderEnabled) ?? true
         arrivalReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .arrivalReminderMinutes) ?? 10
+        transferReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .transferReminderEnabled) ?? true
+        transferReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .transferReminderMinutes) ?? 10
     }
 }
 
 struct AppConfig: Codable {
     var fromStation: Station?
+    var viaStation: Station?
     var toStation: Station?
     var trainNumber: String?
+    var secondLegTrainNumber: String?
     var savedRoutes: [SavedRoute]
     var notifications: NotificationSettings = NotificationSettings()
 
@@ -78,8 +97,10 @@ struct AppConfig: Codable {
 
     enum CodingKeys: String, CodingKey {
         case fromStation
+        case viaStation
         case toStation
         case trainNumber
+        case secondLegTrainNumber
         case savedRoutes
         case notifications
     }
@@ -87,8 +108,10 @@ struct AppConfig: Codable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         fromStation = try container.decodeIfPresent(Station.self, forKey: .fromStation)
+        viaStation = try container.decodeIfPresent(Station.self, forKey: .viaStation)
         toStation = try container.decodeIfPresent(Station.self, forKey: .toStation)
         trainNumber = try container.decodeIfPresent(String.self, forKey: .trainNumber)
+        secondLegTrainNumber = try container.decodeIfPresent(String.self, forKey: .secondLegTrainNumber)
         savedRoutes = try container.decode([SavedRoute].self, forKey: .savedRoutes)
         notifications = try container.decodeIfPresent(
             NotificationSettings.self,
@@ -99,8 +122,10 @@ struct AppConfig: Codable {
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(fromStation, forKey: .fromStation)
+        try container.encodeIfPresent(viaStation, forKey: .viaStation)
         try container.encodeIfPresent(toStation, forKey: .toStation)
         try container.encodeIfPresent(trainNumber, forKey: .trainNumber)
+        try container.encodeIfPresent(secondLegTrainNumber, forKey: .secondLegTrainNumber)
         try container.encode(savedRoutes, forKey: .savedRoutes)
         try container.encode(notifications, forKey: .notifications)
     }

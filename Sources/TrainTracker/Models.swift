@@ -66,6 +66,18 @@ enum TrainStatus {
     case error(String, [TrainOption])
 }
 
+struct TrainLegSummary {
+    let trainName: String
+    let fromName: String
+    let toName: String
+    let scheduledDeparture: Date
+    let scheduledArrival: Date
+    let departureDelaySecs: Int
+    let arrivalDelaySecs: Int
+    let departurePlatform: String?
+    let arrivalPlatform: String?
+}
+
 struct TrainData {
     let trainName: String
     let fromName: String
@@ -78,6 +90,22 @@ struct TrainData {
     let arrivalPlatform: String?
     let stopovers: [StopoverInfo]
     let isEnRoute: Bool
+    let nextLeg: TrainLegSummary?
+
+    init(trainName: String, fromName: String, toName: String, scheduledDeparture: Date, scheduledArrival: Date, departureDelaySecs: Int, arrivalDelaySecs: Int, departurePlatform: String?, arrivalPlatform: String?, stopovers: [StopoverInfo], isEnRoute: Bool, nextLeg: TrainLegSummary? = nil) {
+        self.trainName = trainName
+        self.fromName = fromName
+        self.toName = toName
+        self.scheduledDeparture = scheduledDeparture
+        self.scheduledArrival = scheduledArrival
+        self.departureDelaySecs = departureDelaySecs
+        self.arrivalDelaySecs = arrivalDelaySecs
+        self.departurePlatform = departurePlatform
+        self.arrivalPlatform = arrivalPlatform
+        self.stopovers = stopovers
+        self.isEnRoute = isEnRoute
+        self.nextLeg = nextLeg
+    }
 }
 
 struct StopoverInfo {
@@ -94,4 +122,14 @@ struct TrainOption {
     let scheduledArrival: Date
     let departureDelaySecs: Int
     let arrivalDelaySecs: Int
+    let secondLegName: String?
+
+    init(name: String, scheduledDeparture: Date, scheduledArrival: Date, departureDelaySecs: Int, arrivalDelaySecs: Int, secondLegName: String? = nil) {
+        self.name = name
+        self.scheduledDeparture = scheduledDeparture
+        self.scheduledArrival = scheduledArrival
+        self.departureDelaySecs = departureDelaySecs
+        self.arrivalDelaySecs = arrivalDelaySecs
+        self.secondLegName = secondLegName
+    }
 }

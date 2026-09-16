@@ -55,4 +55,41 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(locations[0].id, "8100013")
         XCTAssertEqual(locations[0].type, "stop")
     }
+
+    func test_trainData_nextLegDefaultsToNilWithoutTouchingExistingCallSites() {
+        let data = TrainData(
+            trainName: "RJX 60", fromName: "Linz Hbf", toName: "Wien Meidling",
+            scheduledDeparture: Date(), scheduledArrival: Date(),
+            departureDelaySecs: 0, arrivalDelaySecs: 0,
+            departurePlatform: nil, arrivalPlatform: nil,
+            stopovers: [], isEnRoute: false
+        )
+        XCTAssertNil(data.nextLeg)
+    }
+
+
+    func test_trainData_nextLegCanBeSet() {
+        let nextLeg = TrainLegSummary(
+            trainName: "REX 1234", fromName: "Wien Meidling", toName: "Wiener Neustadt Hbf",
+            scheduledDeparture: Date(), scheduledArrival: Date(),
+            departureDelaySecs: 0, arrivalDelaySecs: 0,
+            departurePlatform: "3", arrivalPlatform: nil
+        )
+        let data = TrainData(
+            trainName: "RJX 60", fromName: "Linz Hbf", toName: "Wien Meidling",
+            scheduledDeparture: Date(), scheduledArrival: Date(),
+            departureDelaySecs: 0, arrivalDelaySecs: 0,
+            departurePlatform: nil, arrivalPlatform: nil,
+            stopovers: [], isEnRoute: false, nextLeg: nextLeg
+        )
+        XCTAssertEqual(data.nextLeg?.trainName, "REX 1234")
+    }
+
+    func test_trainOption_secondLegNameDefaultsToNil() {
+        let option = TrainOption(
+            name: "RJX 60", scheduledDeparture: Date(), scheduledArrival: Date(),
+            departureDelaySecs: 0, arrivalDelaySecs: 0
+        )
+        XCTAssertNil(option.secondLegName)
+    }
 }
