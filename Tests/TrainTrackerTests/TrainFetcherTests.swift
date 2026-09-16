@@ -296,6 +296,21 @@ final class TrainFetcherTests: XCTestCase {
         XCTAssertEqual(refreshCount3, 2, "Third fetch must use the rotated token")
         XCTAssertEqual(fetchCount3, 12, "No fallback to full batch expected")
     }
+    func test_fetch_passesViaIdFromConfigToClient() async {
+        let mock = MockOeBBClient()
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "RJX 60",
+            plannedDep: iso8601(now.addingTimeInterval(-600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600))
+        )
+        await mock.setup(journeys: [journey])
+        var config = makeConfig(trainNumber: "RJX 60")
+        config.viaStation = Station(name: "Wien Meidling", id: "8100523")
+        _ = await TrainFetcher(client: mock).fetch(config: config)
+        let lastViaId = await mock.lastViaId
+        XCTAssertEqual(lastViaId, "8100523")
+    }
 }
 
 // MARK: - Helpers
@@ -359,21 +374,21 @@ private actor MockOeBBClient: OeBBClientProtocol {
     private(set) var refreshError: Error?
     private(set) var fetchJourneysCallCount = 0
     private(set) var refreshJourneyCallCount = 0
+    private(set) var lastViaId: String?
 
     func setup(journeys: [APIJourney] = [], refresh: APIJourney? = nil, error: Error? = nil) {
         self.journeysToReturn = journeys
         self.refreshToReturn = refresh
         self.refreshError = error
     }
-
     func setRefreshError(_ error: Error?) {
         self.refreshError = error
     }
-
     func searchStations(query: String) async throws -> [APILocation] { [] }
 
-    func fetchJourneys(fromId: String, toId: String, departure: Date) async throws -> [APIJourney] {
+    func fetchJourneys(fromId: String, toId: String, departure: Date, viaId: String?) async throws -> [APIJourney] {
         fetchJourneysCallCount += 1
+        lastViaId = viaId
         return journeysToReturn
     }
 

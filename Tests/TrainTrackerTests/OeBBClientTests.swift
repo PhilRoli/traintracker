@@ -21,12 +21,26 @@ final class OeBBClientTests: XCTestCase {
 
     func test_journeysURL() {
         let dep = Date(timeIntervalSince1970: 1_716_548_160) // fixed timestamp
-        let url = OeBBClient.journeysURL(fromId: "8100013", toId: "8100002", departure: dep)
+        let url = OeBBClient.journeysURL(fromId: "8100013", toId: "8100002", departure: dep, viaId: nil)
         XCTAssertNotNil(url)
         XCTAssertTrue(url!.absoluteString.contains("from=8100013"))
         XCTAssertTrue(url!.absoluteString.contains("to=8100002"))
         XCTAssertTrue(url!.absoluteString.contains("stopovers=true"))
         XCTAssertTrue(url!.absoluteString.contains("results=12"))
+    }
+
+    func test_journeysURL_includesViaWhenSet() {
+        let dep = Date(timeIntervalSince1970: 1_716_548_160)
+        let url = OeBBClient.journeysURL(fromId: "8100013", toId: "8100108", departure: dep, viaId: "8100523")
+        XCTAssertNotNil(url)
+        XCTAssertTrue(url!.absoluteString.contains("via=8100523"))
+    }
+
+    func test_journeysURL_omitsViaWhenNil() {
+        let dep = Date(timeIntervalSince1970: 1_716_548_160)
+        let url = OeBBClient.journeysURL(fromId: "8100013", toId: "8100002", departure: dep, viaId: nil)
+        XCTAssertNotNil(url)
+        XCTAssertFalse(url!.absoluteString.contains("via="))
     }
 
     func test_refreshJourneyURL() {

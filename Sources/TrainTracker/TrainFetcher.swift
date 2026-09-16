@@ -41,7 +41,12 @@ final class TrainFetcher {
             // tryRefresh cleared the token on failure; fall through to full fetch
         }
 
-        let journeys = await fetchAllJourneys(fromId: from.id, toId: destination.id, now: now)
+        let journeys = await fetchAllJourneys(
+            fromId: from.id,
+            toId: destination.id,
+            viaId: config.viaStation?.id,
+            now: now
+        )
         let options = buildOptions(from: journeys)
         cachedOptions = options
 
@@ -91,12 +96,12 @@ final class TrainFetcher {
 
     // MARK: - Concurrent journey fetch
 
-    private func fetchAllJourneys(fromId: String, toId: String, now: Date) async -> [APIJourney] {
+    private func fetchAllJourneys(fromId: String, toId: String, viaId: String?, now: Date) async -> [APIJourney] {
         await withTaskGroup(of: [APIJourney].self) { group in
             for offset in Self.offsets {
                 let dep = now.addingTimeInterval(offset)
                 group.addTask { [self] in
-                    (try? await client.fetchJourneys(fromId: fromId, toId: toId, departure: dep)) ?? []
+                    (try? await client.fetchJourneys(fromId: fromId, toId: toId, departure: dep, viaId: viaId)) ?? []
                 }
             }
             var all: [APIJourney] = []

@@ -3,7 +3,7 @@ import Foundation
 
 protocol OeBBClientProtocol {
     func searchStations(query: String) async throws -> [APILocation]
-    func fetchJourneys(fromId: String, toId: String, departure: Date) async throws -> [APIJourney]
+    func fetchJourneys(fromId: String, toId: String, departure: Date, viaId: String?) async throws -> [APIJourney]
     func refreshJourney(token: String) async throws -> APIJourney
 }
 
@@ -33,18 +33,22 @@ final class OeBBClient: OeBBClientProtocol {
         return components?.url
     }
 
-    static func journeysURL(fromId: String, toId: String, departure: Date) -> URL? {
+    static func journeysURL(fromId: String, toId: String, departure: Date, viaId: String?) -> URL? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         let depString = formatter.string(from: departure)
         var components = URLComponents(string: "\(baseURL)/journeys")
-        components?.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "from", value: fromId),
             URLQueryItem(name: "to", value: toId),
             URLQueryItem(name: "departure", value: depString),
             URLQueryItem(name: "results", value: "12"),
             URLQueryItem(name: "stopovers", value: "true")
         ]
+        if let viaId {
+            queryItems.append(URLQueryItem(name: "via", value: viaId))
+        }
+        components?.queryItems = queryItems
         return components?.url
     }
 
@@ -68,8 +72,8 @@ final class OeBBClient: OeBBClientProtocol {
         return try JSONDecoder().decode([APILocation].self, from: data)
     }
 
-    func fetchJourneys(fromId: String, toId: String, departure: Date) async throws -> [APIJourney] {
-        guard let url = Self.journeysURL(fromId: fromId, toId: toId, departure: departure) else {
+    func fetchJourneys(fromId: String, toId: String, departure: Date, viaId: String?) async throws -> [APIJourney] {
+        guard let url = Self.journeysURL(fromId: fromId, toId: toId, departure: departure, viaId: viaId) else {
             throw OeBBError.invalidURL
         }
         let (data, response) = try await session.data(from: url)
