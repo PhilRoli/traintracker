@@ -366,9 +366,9 @@ extension TrainFetcherTests {
     }
 }
 
-// MARK: - MockOeBBClient
+// MARK: - MockOeBBClient (internal — also used by TrainFetcherViaTests.swift)
 
-private actor MockOeBBClient: OeBBClientProtocol {
+actor MockOeBBClient: OeBBClientProtocol {
     private(set) var journeysToReturn: [APIJourney] = []
     private(set) var refreshToReturn: APIJourney?
     private(set) var refreshError: Error?

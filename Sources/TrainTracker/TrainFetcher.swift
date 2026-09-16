@@ -28,14 +28,17 @@ final class TrainFetcher {
         }
 
         let now = Date()
-        let configKey = "\(from.id)|\(destination.id)|\(config.trainNumber ?? "")"
+        let configKey = "\(from.id)|\(destination.id)|\(config.viaStation?.id ?? "")"
+            + "|\(config.trainNumber ?? "")|\(config.secondLegTrainNumber ?? "")"
         if configKey != cachedConfigKey {
             invalidateCache()
             cachedConfigKey = configKey
         }
 
         if let token = cachedRefreshToken, let trainNumber = config.trainNumber {
-            if let trainData = await tryRefresh(token: token, trainNumber: trainNumber, now: now) {
+            if let trainData = await tryRefresh(
+                token: token, trainNumber: trainNumber, secondLegTrainNumber: config.secondLegTrainNumber, now: now
+            ) {
                 return .tracking(trainData, cachedOptions)
             }
             // tryRefresh cleared the token on failure; fall through to full fetch
@@ -53,21 +56,41 @@ final class TrainFetcher {
         guard let trainNumber = config.trainNumber else {
             return .pickTrain(options)
         }
-        guard let (trainData, token) = findTrainWithToken(named: trainNumber, in: journeys, now: now) else {
+        guard let (trainData, token) = findTrainWithToken(
+            named: trainNumber, secondLegTrainNumber: config.secondLegTrainNumber, in: journeys, now: now
+        ) else {
+            if let secondLegTrainNumber = config.secondLegTrainNumber,
+               journeys.contains(where: { Self.namedLegs(in: $0)?.leg0.line?.name == trainNumber }) {
+                return .error(
+                    "Missed connection — \(secondLegTrainNumber) not found after \(trainNumber). "
+                        + "Use Switch Train to reselect.",
+                    options
+                )
+            }
             return .error("\(trainNumber) not found — use Switch Train to reselect", options)
         }
         if let newToken = token { cachedRefreshToken = newToken }
         return .tracking(trainData, options)
     }
 
-    private func tryRefresh(token: String, trainNumber: String, now: Date) async -> TrainData? {
+    private func tryRefresh(
+        token: String, trainNumber: String, secondLegTrainNumber: String?, now: Date
+    ) async -> TrainData? {
         guard let journey = try? await client.refreshJourney(token: token) else {
             cachedRefreshToken = nil
             return nil
         }
-        guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
-              let trainData = buildTrainData(leg: leg, now: now)
-        else {
+        guard let (leg0, leg1) = Self.namedLegs(in: journey), leg0.line?.name == trainNumber else {
+            cachedRefreshToken = nil
+            return nil
+        }
+        if let secondLegTrainNumber {
+            guard leg1?.line?.name == secondLegTrainNumber else {
+                cachedRefreshToken = nil
+                return nil
+            }
+        }
+        guard let trainData = buildTrainData(leg0: leg0, leg1: leg1, now: now) else {
             cachedRefreshToken = nil
             return nil
         }
@@ -77,12 +100,16 @@ final class TrainFetcher {
 
     private func findTrainWithToken(
         named trainNumber: String,
+        secondLegTrainNumber: String?,
         in journeys: [APIJourney],
         now: Date
     ) -> (TrainData, String?)? {
         for journey in journeys {
-            guard let leg = journey.legs.first(where: { $0.line?.name == trainNumber }),
-                  let trainData = buildTrainData(leg: leg, now: now) else { continue }
+            guard let (leg0, leg1) = Self.namedLegs(in: journey), leg0.line?.name == trainNumber else { continue }
+            if let secondLegTrainNumber {
+                guard leg1?.line?.name == secondLegTrainNumber else { continue }
+            }
+            guard let trainData = buildTrainData(leg0: leg0, leg1: leg1, now: now) else { continue }
             return (trainData, journey.refreshToken)
         }
         return nil
@@ -110,43 +137,53 @@ final class TrainFetcher {
         }
     }
 
-    // MARK: - Deduplication (by trainName + plannedDeparture, exact)
+    // MARK: - Deduplication (by trainName + plannedDeparture, exact; leg1 included when present)
 
     static func deduplicated(_ journeys: [APIJourney]) -> [APIJourney] {
         var seen = Set<String>()
         return journeys.filter { journey in
-            guard let leg = journey.legs.first(where: { $0.line?.name != nil }),
-                  let name = leg.line?.name,
-                  let dep = leg.plannedDeparture ?? leg.departure
+            guard let (leg0, leg1) = namedLegs(in: journey),
+                  let name0 = leg0.line?.name,
+                  let dep0 = leg0.plannedDeparture ?? leg0.departure
             else { return false }
-            return seen.insert("\(name)|\(dep)").inserted
+            var key = "\(name0)|\(dep0)"
+            if let leg1, let name1 = leg1.line?.name, let dep1 = leg1.plannedDeparture ?? leg1.departure {
+                key += "|\(name1)|\(dep1)"
+            }
+            return seen.insert(key).inserted
         }
     }
 
     // MARK: - Build train option list
 
     func buildOptions(from journeys: [APIJourney], now: Date = Date()) -> [TrainOption] {
-        var seenNames = Set<String>()
+        var seenKeys = Set<String>()
         var options: [TrainOption] = []
 
         for journey in journeys {
-            guard let leg = journey.legs.first(where: { $0.line?.name != nil }),
-                  let name = leg.line?.name, !name.isEmpty,
-                  let schDep = Self.parseDate(leg.plannedDeparture ?? leg.departure),
-                  let schArr = Self.parseDate(leg.plannedArrival ?? leg.arrival),
-                  seenNames.insert(name).inserted
+            guard let (leg0, leg1) = Self.namedLegs(in: journey),
+                  let name0 = leg0.line?.name, !name0.isEmpty,
+                  let schDep = Self.parseDate(leg0.plannedDeparture ?? leg0.departure)
             else { continue }
 
-            let rtArr = schArr.addingTimeInterval(TimeInterval(leg.arrivalDelay ?? 0))
+            let name1 = leg1?.line?.name
+            let key = [name0, name1].compactMap { $0 }.joined(separator: " → ")
+            guard seenKeys.insert(key).inserted else { continue }
+
+            let finalLeg = leg1 ?? leg0
+            guard let schArr = Self.parseDate(finalLeg.plannedArrival ?? finalLeg.arrival) else { continue }
+
+            let rtArr = schArr.addingTimeInterval(TimeInterval(finalLeg.arrivalDelay ?? 0))
             // Grace period handles trains delayed beyond scheduled arrival with no real-time data
             guard rtArr > now.addingTimeInterval(-30 * 60) else { continue }
 
             options.append(TrainOption(
-                name: name,
+                name: name0,
                 scheduledDeparture: schDep,
                 scheduledArrival: schArr,
-                departureDelaySecs: leg.departureDelay ?? 0,
-                arrivalDelaySecs: leg.arrivalDelay ?? 0
+                departureDelaySecs: leg0.departureDelay ?? 0,
+                arrivalDelaySecs: finalLeg.arrivalDelay ?? 0,
+                secondLegName: name1
             ))
         }
         return options.sorted { $0.scheduledDeparture < $1.scheduledDeparture }
@@ -154,13 +191,54 @@ final class TrainFetcher {
 
     // MARK: - Find specific train by exact name
 
-    func findTrain(named trainNumber: String, in journeys: [APIJourney], now: Date) -> TrainData? {
-        findTrainWithToken(named: trainNumber, in: journeys, now: now)?.0
+    func findTrain(
+        named trainNumber: String,
+        secondLegTrainNumber: String? = nil,
+        in journeys: [APIJourney],
+        now: Date
+    ) -> TrainData? {
+        findTrainWithToken(named: trainNumber, secondLegTrainNumber: secondLegTrainNumber, in: journeys, now: now)?.0
+    }
+
+    // MARK: - Two-leg (via) helpers
+
+    private static func namedLegs(in journey: APIJourney) -> (leg0: APILeg, leg1: APILeg?)? {
+        let named = journey.legs.filter { $0.line?.name != nil }
+        guard let leg0 = named.first else { return nil }
+        return (leg0, named.count > 1 ? named[1] : nil)
+    }
+
+    private static func legSummary(_ leg: APILeg) -> TrainLegSummary? {
+        guard let name = leg.line?.name,
+              let schDep = parseDate(leg.plannedDeparture ?? leg.departure),
+              let schArr = parseDate(leg.plannedArrival ?? leg.arrival)
+        else { return nil }
+        return TrainLegSummary(
+            trainName: name,
+            fromName: leg.origin.name,
+            toName: leg.destination.name,
+            scheduledDeparture: schDep,
+            scheduledArrival: schArr,
+            departureDelaySecs: leg.departureDelay ?? 0,
+            arrivalDelaySecs: leg.arrivalDelay ?? 0,
+            departurePlatform: leg.departurePlatform,
+            arrivalPlatform: leg.arrivalPlatform
+        )
+    }
+
+    private func buildTrainData(leg0: APILeg, leg1: APILeg?, now: Date) -> TrainData? {
+        guard let leg1 else { return buildTrainData(leg: leg0, now: now) }
+        let leg0RtArrival = Self.parseDate(leg0.plannedArrival ?? leg0.arrival)
+            .map { $0.addingTimeInterval(TimeInterval(leg0.arrivalDelay ?? 0)) }
+        if let leg0RtArrival, now >= leg0RtArrival {
+            return buildTrainData(leg: leg1, now: now)
+        }
+        return buildTrainData(leg: leg0, now: now, nextLeg: Self.legSummary(leg1))
     }
 
     // MARK: - Build TrainData from a leg
 
-    private func buildTrainData(leg: APILeg, now: Date) -> TrainData? {
+    private func buildTrainData(leg: APILeg, now: Date, nextLeg: TrainLegSummary? = nil) -> TrainData? {
         guard let name = leg.line?.name,
               let schDep = Self.parseDate(leg.plannedDeparture ?? leg.departure),
               let schArr = Self.parseDate(leg.plannedArrival ?? leg.arrival)
@@ -180,7 +258,8 @@ final class TrainFetcher {
             departurePlatform: leg.departurePlatform,
             arrivalPlatform: leg.arrivalPlatform,
             stopovers: buildStopovers(stopovers: leg.stopovers ?? [], now: now),
-            isEnRoute: rtDep <= now
+            isEnRoute: rtDep <= now,
+            nextLeg: nextLeg
         )
     }
 
