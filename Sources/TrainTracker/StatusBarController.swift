@@ -149,7 +149,7 @@ extension StatusBarController {
         case .pickTrain(let options):
             menu.addItem(disabled("Pick your train:"))
             menu.addItem(.separator())
-            addTrainOptions(options, to: menu, currentTrain: nil)
+            addTrainOptions(options, to: menu, currentTrain: nil, currentSecondLeg: nil)
             menu.addItem(.separator())
             menu.addItem(makeRouteSubmenu(config: config))
 
@@ -162,7 +162,12 @@ extension StatusBarController {
             menu.addItem(.separator())
             let switchItem = NSMenuItem(title: "Switch Train…", action: nil, keyEquivalent: "")
             let switchSub = NSMenu()
-            addTrainOptions(options, to: switchSub, currentTrain: trainData.trainName)
+            addTrainOptions(
+                options,
+                to: switchSub,
+                currentTrain: config.trainNumber,
+                currentSecondLeg: config.secondLegTrainNumber
+            )
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
             menu.addItem(action("Deselect Train", #selector(deselectTrain), key: ""))
@@ -173,7 +178,7 @@ extension StatusBarController {
             menu.addItem(.separator())
             let switchItem = NSMenuItem(title: "Switch Train…", action: nil, keyEquivalent: "")
             let switchSub = NSMenu()
-            addTrainOptions(options, to: switchSub, currentTrain: nil)
+            addTrainOptions(options, to: switchSub, currentTrain: nil, currentSecondLeg: nil)
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
             menu.addItem(makeRouteSubmenu(config: config))
@@ -251,7 +256,12 @@ extension StatusBarController {
         }
     }
 
-    private func addTrainOptions(_ options: [TrainOption], to menu: NSMenu, currentTrain: String?) {
+    private func addTrainOptions(
+        _ options: [TrainOption],
+        to menu: NSMenu,
+        currentTrain: String?,
+        currentSecondLeg: String?
+    ) {
         for opt in options {
             let emoji = Self.trainTypeEmoji(opt.name)
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
@@ -266,7 +276,7 @@ extension StatusBarController {
             let item = NSMenuItem(title: title, action: #selector(selectTrain(_:)), keyEquivalent: "")
             item.representedObject = opt
             item.target = self
-            if opt.name == currentTrain { item.state = .on }
+            if opt.name == currentTrain && opt.secondLegName == currentSecondLeg { item.state = .on }
             menu.addItem(item)
         }
         if options.isEmpty {

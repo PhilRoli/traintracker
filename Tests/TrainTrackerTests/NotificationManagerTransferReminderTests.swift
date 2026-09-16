@@ -23,7 +23,6 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
     func test_transferReminder_firesWhenWithinWindow() {
         let (manager, spy) = makeManager()
         var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
         settings.transferReminderMinutes = 10
 
         let data = makeTrainData(
@@ -44,7 +43,6 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
     func test_transferReminder_doesNotFireOutsideWindow() {
         let (manager, spy) = makeManager()
         var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
         settings.transferReminderMinutes = 10
 
         let data = makeTrainData(
@@ -60,8 +58,7 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
 
     func test_transferReminder_doesNotFireWhenNextLegIsNil() {
         let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
+        let settings = NotificationSettings()
 
         let data = makeTrainData(
             scheduledArrival: Date().addingTimeInterval(5 * 60),
@@ -71,13 +68,14 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
 
         manager.process(data, settings: settings)
 
-        XCTAssertEqual(spy.posted.count, 0)
+        // nextLeg is nil, so this is a final arrival, not a transfer: the arrival
+        // reminder is expected to fire here, but no transfer notification should.
+        XCTAssertFalse(spy.posted.contains { $0.identifier.hasPrefix("transfer-") })
     }
 
     func test_transferReminder_doesNotFireWhenDisabled() {
         let (manager, spy) = makeManager()
         var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
         settings.transferReminderEnabled = false
 
         let data = makeTrainData(
@@ -93,8 +91,7 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
 
     func test_transferReminder_doesNotFireTwiceForSameLeg() {
         let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
+        let settings = NotificationSettings()
         let data = makeTrainData(
             scheduledArrival: Date().addingTimeInterval(5 * 60),
             isEnRoute: true,
@@ -109,8 +106,7 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
 
     func test_transferReminder_fallsBackToNoPlatformWording() {
         let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
+        let settings = NotificationSettings()
 
         let data = makeTrainData(
             scheduledArrival: Date().addingTimeInterval(5 * 60),
@@ -127,8 +123,7 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
 
     func test_stateReset_transferReminderCanFireAgainForDifferentTrip() {
         let (manager, spy) = makeManager()
-        var settings = NotificationSettings()
-        settings.arrivalReminderEnabled = false
+        let settings = NotificationSettings()
 
         let data1 = makeTrainData(
             trainName: "RJX 60",
@@ -147,5 +142,24 @@ final class NotificationManagerTransferReminderTests: XCTestCase {
         )
         manager.process(data2, settings: settings)
         XCTAssertEqual(spy.posted.count, 2)
+    }
+
+    func test_onlyTransferReminderFires_whenArrivalAndTransferBothEnabledAndWithinWindow() {
+        let (manager, spy) = makeManager()
+        var settings = NotificationSettings()
+        settings.arrivalReminderEnabled = true
+        settings.transferReminderEnabled = true
+
+        let data = makeTrainData(
+            toName: "Wien Meidling",
+            scheduledArrival: Date().addingTimeInterval(8 * 60),
+            isEnRoute: true,
+            nextLeg: makeNextLeg()
+        )
+
+        manager.process(data, settings: settings)
+
+        XCTAssertEqual(spy.posted.count, 1)
+        XCTAssertTrue(spy.posted[0].identifier.hasPrefix("transfer-"))
     }
 }

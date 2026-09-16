@@ -115,6 +115,9 @@ extension PreferencesWindowController: NSTextFieldDelegate {
 
     func controlTextDidChange(_ obj: Notification) {
         guard let field = obj.object as? NSTextField else { return }
+        if field === viaField, field.stringValue.trimmingCharacters(in: .whitespaces).isEmpty {
+            pendingVia = nil
+        }
         scheduleSearch(query: field.stringValue)
     }
 }

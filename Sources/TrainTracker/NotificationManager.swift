@@ -75,7 +75,7 @@ final class NotificationManager {
     }
 
     private func processArrivalReminder(data: TrainData, settings: NotificationSettings, key: String) {
-        guard settings.arrivalReminderEnabled, arrivalReminderSentFor != key else { return }
+        guard settings.arrivalReminderEnabled, data.nextLeg == nil, arrivalReminderSentFor != key else { return }
 
         let rtArr = data.scheduledArrival.addingTimeInterval(TimeInterval(data.arrivalDelaySecs))
         let secsUntil = rtArr.timeIntervalSinceNow
