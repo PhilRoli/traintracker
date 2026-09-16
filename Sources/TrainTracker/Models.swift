@@ -92,7 +92,20 @@ struct TrainData {
     let isEnRoute: Bool
     let nextLeg: TrainLegSummary?
 
-    init(trainName: String, fromName: String, toName: String, scheduledDeparture: Date, scheduledArrival: Date, departureDelaySecs: Int, arrivalDelaySecs: Int, departurePlatform: String?, arrivalPlatform: String?, stopovers: [StopoverInfo], isEnRoute: Bool, nextLeg: TrainLegSummary? = nil) {
+    init(
+        trainName: String,
+        fromName: String,
+        toName: String,
+        scheduledDeparture: Date,
+        scheduledArrival: Date,
+        departureDelaySecs: Int,
+        arrivalDelaySecs: Int,
+        departurePlatform: String?,
+        arrivalPlatform: String?,
+        stopovers: [StopoverInfo],
+        isEnRoute: Bool,
+        nextLeg: TrainLegSummary? = nil
+    ) {
         self.trainName = trainName
         self.fromName = fromName
         self.toName = toName
@@ -124,7 +137,14 @@ struct TrainOption {
     let arrivalDelaySecs: Int
     let secondLegName: String?
 
-    init(name: String, scheduledDeparture: Date, scheduledArrival: Date, departureDelaySecs: Int, arrivalDelaySecs: Int, secondLegName: String? = nil) {
+    init(
+        name: String,
+        scheduledDeparture: Date,
+        scheduledArrival: Date,
+        departureDelaySecs: Int,
+        arrivalDelaySecs: Int,
+        secondLegName: String? = nil
+    ) {
         self.name = name
         self.scheduledDeparture = scheduledDeparture
         self.scheduledArrival = scheduledArrival

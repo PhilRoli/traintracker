@@ -67,7 +67,6 @@ final class ModelsTests: XCTestCase {
         XCTAssertNil(data.nextLeg)
     }
 
-
     func test_trainData_nextLegCanBeSet() {
         let nextLeg = TrainLegSummary(
             trainName: "REX 1234", fromName: "Wien Meidling", toName: "Wiener Neustadt Hbf",
