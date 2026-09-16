@@ -129,7 +129,9 @@ extension StatusBarController {
         let sub = NSMenu()
         var currentRoute: SavedRoute?
         if let from = config.fromStation, let destination = config.toStation {
-            currentRoute = config.savedRoutes.first { $0.from == from && $0.toStation == destination }
+            currentRoute = config.savedRoutes.first {
+                $0.from == from && $0.toStation == destination && $0.viaStation == config.viaStation
+            }
         }
         addRouteOptions(config.savedRoutes, to: sub, currentRoute: currentRoute)
         item.submenu = sub
@@ -201,6 +203,14 @@ extension StatusBarController {
         if let depPlatform = trainData.departurePlatform, let arrPlatform = trainData.arrivalPlatform {
             menu.addItem(disabled("Platform: \(depPlatform) → \(arrPlatform)"))
         }
+
+        if let nextLeg = trainData.nextLeg {
+            let nextEmoji = Self.trainTypeEmoji(nextLeg.trainName)
+            let nextDep = Self.formatHHMM(nextLeg.scheduledDeparture, delaySecs: nextLeg.departureDelaySecs)
+            let platformStr = nextLeg.departurePlatform.map { ", platform \($0)" } ?? ""
+            let nextLine = "→ then \(nextEmoji) \(nextLeg.trainName) to \(nextLeg.toName)\(platformStr) (\(nextDep))"
+            menu.addItem(disabled(nextLine))
+        }
     }
 
     private func addStopovers(_ stopovers: [StopoverInfo], to menu: NSMenu) {
@@ -246,12 +256,15 @@ extension StatusBarController {
             let emoji = Self.trainTypeEmoji(opt.name)
             let dep = Self.formatHHMM(opt.scheduledDeparture, delaySecs: opt.departureDelaySecs)
             let arr = Self.formatHHMM(opt.scheduledArrival, delaySecs: opt.arrivalDelaySecs)
-            let item = NSMenuItem(
-                title: "\(emoji) \(opt.name) \(dep) → \(arr)",
-                action: #selector(selectTrain(_:)),
-                keyEquivalent: ""
-            )
-            item.representedObject = opt.name
+            let title: String
+            if let secondLegName = opt.secondLegName {
+                let secondEmoji = Self.trainTypeEmoji(secondLegName)
+                title = "\(emoji) \(opt.name) → \(secondEmoji) \(secondLegName)  \(dep) → \(arr)"
+            } else {
+                title = "\(emoji) \(opt.name) \(dep) → \(arr)"
+            }
+            let item = NSMenuItem(title: title, action: #selector(selectTrain(_:)), keyEquivalent: "")
+            item.representedObject = opt
             item.target = self
             if opt.name == currentTrain { item.state = .on }
             menu.addItem(item)
@@ -280,9 +293,10 @@ extension StatusBarController {
 
 extension StatusBarController {
     @objc private func selectTrain(_ sender: NSMenuItem) {
-        guard let name = sender.representedObject as? String else { return }
+        guard let option = sender.representedObject as? TrainOption else { return }
         var config = AppConfigStore.shared.load()
-        config.trainNumber = name
+        config.trainNumber = option.name
+        config.secondLegTrainNumber = option.secondLegName
         AppConfigStore.shared.save(config)
         Task { await refresh() }
     }
@@ -290,6 +304,7 @@ extension StatusBarController {
     @objc private func deselectTrain() {
         var config = AppConfigStore.shared.load()
         config.trainNumber = nil
+        config.secondLegTrainNumber = nil
         AppConfigStore.shared.save(config)
         Task { await refresh() }
     }
@@ -298,8 +313,10 @@ extension StatusBarController {
         guard let route = sender.representedObject as? SavedRoute else { return }
         var config = AppConfigStore.shared.load()
         config.fromStation = route.from
+        config.viaStation = route.viaStation
         config.toStation = route.toStation
         config.trainNumber = nil
+        config.secondLegTrainNumber = nil
         AppConfigStore.shared.save(config)
         Task { await refresh() }
     }
