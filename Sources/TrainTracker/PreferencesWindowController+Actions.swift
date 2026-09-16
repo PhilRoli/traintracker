@@ -14,6 +14,9 @@ extension PreferencesWindowController {
         case .from:
             pendingFrom = station
             fromField.stringValue = station.name
+        case .via:
+            pendingVia = station
+            viaField.stringValue = station.name
         case .destination:
             pendingTo = station
             toField.stringValue = station.name
@@ -31,8 +34,10 @@ extension PreferencesWindowController {
         guard row >= 0, row < savedRoutes.count else { return }
         let route = savedRoutes[row]
         pendingFrom = route.from
+        pendingVia = route.viaStation
         pendingTo = route.toStation
         fromField.stringValue = route.from.name
+        viaField.stringValue = route.viaStation?.name ?? ""
         toField.stringValue = route.toStation.name
         searchResults = []
         resultsTable.reloadData()
@@ -52,22 +57,29 @@ extension PreferencesWindowController {
         departureReminderField.isEnabled = departureReminderCheckbox.state == .on
         delayAlertField.isEnabled = delayAlertCheckbox.state == .on
         arrivalReminderField.isEnabled = arrivalReminderCheckbox.state == .on
+        transferReminderField.isEnabled = transferReminderCheckbox.state == .on
     }
 
     @objc func saveAndClose() {
         var config = AppConfigStore.shared.load()
-        let stationsChanged = config.fromStation != pendingFrom || config.toStation != pendingTo
+        let stationsChanged = config.fromStation != pendingFrom
+            || config.viaStation != pendingVia
+            || config.toStation != pendingTo
         config.fromStation = pendingFrom
+        config.viaStation = pendingVia
         config.toStation = pendingTo
         var routes = savedRoutes
         if let fromStation = pendingFrom, let toStation = pendingTo {
-            let route = SavedRoute(from: fromStation, toStation: toStation)
+            let route = SavedRoute(from: fromStation, toStation: toStation, viaStation: pendingVia)
             if !routes.contains(route) {
                 routes.append(route)
             }
         }
         config.savedRoutes = routes
-        if stationsChanged { config.trainNumber = nil }
+        if stationsChanged {
+            config.trainNumber = nil
+            config.secondLegTrainNumber = nil
+        }
         config.notifications = NotificationSettings(
             departureReminderEnabled: departureReminderCheckbox.state == .on,
             departureReminderMinutes: max(1, departureReminderField.integerValue),
@@ -75,7 +87,9 @@ extension PreferencesWindowController {
             delayAlertThresholdMinutes: max(1, delayAlertField.integerValue),
             platformChangeEnabled: platformChangeCheckbox.state == .on,
             arrivalReminderEnabled: arrivalReminderCheckbox.state == .on,
-            arrivalReminderMinutes: max(1, arrivalReminderField.integerValue)
+            arrivalReminderMinutes: max(1, arrivalReminderField.integerValue),
+            transferReminderEnabled: transferReminderCheckbox.state == .on,
+            transferReminderMinutes: max(1, transferReminderField.integerValue)
         )
         AppConfigStore.shared.save(config)
         close()
@@ -128,6 +142,7 @@ extension PreferencesWindowController {
 
     private func refreshFieldsFromLoadedConfig() {
         fromField.stringValue = pendingFrom?.name ?? ""
+        viaField.stringValue = pendingVia?.name ?? ""
         toField.stringValue = pendingTo?.name ?? ""
         savedRoutesTable.reloadData()
         departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
@@ -140,6 +155,9 @@ extension PreferencesWindowController {
         arrivalReminderCheckbox.state = pendingNotifications.arrivalReminderEnabled ? .on : .off
         arrivalReminderField.integerValue = pendingNotifications.arrivalReminderMinutes
         arrivalReminderField.isEnabled = pendingNotifications.arrivalReminderEnabled
+        transferReminderCheckbox.state = pendingNotifications.transferReminderEnabled ? .on : .off
+        transferReminderField.integerValue = pendingNotifications.transferReminderMinutes
+        transferReminderField.isEnabled = pendingNotifications.transferReminderEnabled
     }
 
     private func showAlert(title: String, message: String) {

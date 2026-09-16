@@ -7,6 +7,7 @@ final class PreferencesWindowController: NSWindowController {
     var onClose: (() -> Void)?
 
     var fromField: NSTextField!
+    var viaField: NSTextField!
     var toField: NSTextField!
     var resultsTable: NSTableView!
     var resultsScrollView: NSScrollView!
@@ -16,6 +17,7 @@ final class PreferencesWindowController: NSWindowController {
     var searchResults: [APILocation] = []
     var savedRoutes: [SavedRoute] = []
     var pendingFrom: Station?
+    var pendingVia: Station?
     var pendingTo: Station?
     private var searchTimer: Timer?
     private var searchTask: Task<Void, Never>?
@@ -31,9 +33,11 @@ final class PreferencesWindowController: NSWindowController {
     var platformChangeCheckbox: NSButton!
     var arrivalReminderCheckbox: NSButton!
     var arrivalReminderField: NSTextField!
+    var transferReminderCheckbox: NSButton!
+    var transferReminderField: NSTextField!
     var pendingNotifications: NotificationSettings = NotificationSettings()
 
-    enum ActiveField { case from, destination, none }
+    enum ActiveField { case from, via, destination, none }
 
     convenience init() {
         let panel = NSPanel(
@@ -54,6 +58,7 @@ final class PreferencesWindowController: NSWindowController {
     func loadCurrentConfig() {
         let config = AppConfigStore.shared.load()
         pendingFrom = config.fromStation
+        pendingVia = config.viaStation
         pendingTo = config.toStation
         savedRoutes = config.savedRoutes
         pendingNotifications = config.notifications
@@ -101,6 +106,8 @@ extension PreferencesWindowController: NSTextFieldDelegate {
         guard let field = obj.object as? NSTextField else { return }
         if field === fromField {
             activeField = .from
+        } else if field === viaField {
+            activeField = .via
         } else if field === toField {
             activeField = .destination
         }

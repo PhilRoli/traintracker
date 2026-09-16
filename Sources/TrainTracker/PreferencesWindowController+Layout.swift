@@ -1,6 +1,12 @@
 // Sources/TrainTracker/PreferencesWindowController+Layout.swift
 import AppKit
 
+private struct ReminderRow {
+    let checkbox: NSButton
+    let field: NSTextField
+    let row: NSView
+}
+
 extension PreferencesWindowController {
     // MARK: - Layout
 
@@ -56,17 +62,23 @@ extension PreferencesWindowController {
         self.fromField = fromField
         let fromRow = makeLabeledFieldRow(label: "From:", field: fromField)
 
+        let viaField = makeTextField(placeholder: "Optional transfer station…")
+        viaField.stringValue = pendingVia?.name ?? ""
+        viaField.delegate = self
+        self.viaField = viaField
+        let viaRow = makeLabeledFieldRow(label: "Via:", field: viaField)
+
         let toField = makeTextField(placeholder: "Search for station…")
         toField.stringValue = pendingTo?.name ?? ""
         toField.delegate = self
         self.toField = toField
         let toRow = makeLabeledFieldRow(label: "To:", field: toField)
 
-        let section = NSStackView(views: [fromRow, toRow])
+        let section = NSStackView(views: [fromRow, viaRow, toRow])
         section.orientation = .vertical
         section.alignment = .leading
         section.spacing = 8
-        for row in [fromRow, toRow] {
+        for row in [fromRow, viaRow, toRow] {
             row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
         }
         return section
@@ -152,41 +164,33 @@ extension PreferencesWindowController {
     private func makeNotificationsSection() -> NSView {
         let label = makeSectionLabel("Notifications")
 
-        departureReminderCheckbox = NSButton(
-            checkboxWithTitle: "Departure reminder",
-            target: self, action: #selector(notifCheckboxChanged(_:))
+        let departure = makeReminderRow(
+            title: "Departure reminder", enabled: pendingNotifications.departureReminderEnabled,
+            minutes: pendingNotifications.departureReminderMinutes, suffix: "minutes before"
         )
-        departureReminderCheckbox.state = pendingNotifications.departureReminderEnabled ? .on : .off
-        departureReminderField = makeNumberField()
-        departureReminderField.integerValue = pendingNotifications.departureReminderMinutes
-        departureReminderField.isEnabled = pendingNotifications.departureReminderEnabled
-        let departureRow = makeNotificationRow(
-            checkbox: departureReminderCheckbox, field: departureReminderField, suffix: "minutes before"
-        )
+        departureReminderCheckbox = departure.checkbox
+        departureReminderField = departure.field
 
-        delayAlertCheckbox = NSButton(
-            checkboxWithTitle: "Delay alert when",
-            target: self, action: #selector(notifCheckboxChanged(_:))
+        let delay = makeReminderRow(
+            title: "Delay alert when", enabled: pendingNotifications.delayAlertEnabled,
+            minutes: pendingNotifications.delayAlertThresholdMinutes, suffix: "+ minutes late"
         )
-        delayAlertCheckbox.state = pendingNotifications.delayAlertEnabled ? .on : .off
-        delayAlertField = makeNumberField()
-        delayAlertField.integerValue = pendingNotifications.delayAlertThresholdMinutes
-        delayAlertField.isEnabled = pendingNotifications.delayAlertEnabled
-        let delayRow = makeNotificationRow(
-            checkbox: delayAlertCheckbox, field: delayAlertField, suffix: "+ minutes late"
-        )
+        delayAlertCheckbox = delay.checkbox
+        delayAlertField = delay.field
 
-        arrivalReminderCheckbox = NSButton(
-            checkboxWithTitle: "Arrival reminder",
-            target: self, action: #selector(notifCheckboxChanged(_:))
+        let arrival = makeReminderRow(
+            title: "Arrival reminder", enabled: pendingNotifications.arrivalReminderEnabled,
+            minutes: pendingNotifications.arrivalReminderMinutes, suffix: "minutes before"
         )
-        arrivalReminderCheckbox.state = pendingNotifications.arrivalReminderEnabled ? .on : .off
-        arrivalReminderField = makeNumberField()
-        arrivalReminderField.integerValue = pendingNotifications.arrivalReminderMinutes
-        arrivalReminderField.isEnabled = pendingNotifications.arrivalReminderEnabled
-        let arrivalRow = makeNotificationRow(
-            checkbox: arrivalReminderCheckbox, field: arrivalReminderField, suffix: "minutes before"
+        arrivalReminderCheckbox = arrival.checkbox
+        arrivalReminderField = arrival.field
+
+        let transfer = makeReminderRow(
+            title: "Transfer reminder", enabled: pendingNotifications.transferReminderEnabled,
+            minutes: pendingNotifications.transferReminderMinutes, suffix: "minutes before"
         )
+        transferReminderCheckbox = transfer.checkbox
+        transferReminderField = transfer.field
 
         platformChangeCheckbox = NSButton(
             checkboxWithTitle: "Platform change alert",
@@ -195,15 +199,29 @@ extension PreferencesWindowController {
         platformChangeCheckbox.state = pendingNotifications.platformChangeEnabled ? .on : .off
 
         let section = NSStackView(views: [
-            makeSeparator(), label, departureRow, delayRow, arrivalRow, platformChangeCheckbox
+            makeSeparator(), label, departure.row, delay.row, arrival.row, transfer.row, platformChangeCheckbox
         ])
         section.orientation = .vertical
         section.alignment = .leading
         section.spacing = 8
-        for row in [departureRow, delayRow, arrivalRow] {
+        for row in [departure.row, delay.row, arrival.row, transfer.row] {
             row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
         }
         return section
+    }
+
+    private func makeReminderRow(
+        title: String, enabled: Bool, minutes: Int, suffix: String
+    ) -> ReminderRow {
+        let checkbox = NSButton(
+            checkboxWithTitle: title, target: self, action: #selector(notifCheckboxChanged(_:))
+        )
+        checkbox.state = enabled ? .on : .off
+        let field = makeNumberField()
+        field.integerValue = minutes
+        field.isEnabled = enabled
+        let row = makeNotificationRow(checkbox: checkbox, field: field, suffix: suffix)
+        return ReminderRow(checkbox: checkbox, field: field, row: row)
     }
 
     private func makeNotificationRow(checkbox: NSButton, field: NSTextField, suffix: String) -> NSView {
