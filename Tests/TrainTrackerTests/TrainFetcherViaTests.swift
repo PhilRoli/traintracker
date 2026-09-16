@@ -72,6 +72,26 @@ final class TrainFetcherViaTests: XCTestCase {
         XCTAssertNil(result?.nextLeg)
     }
 
+    func test_findTrain_naturalTwoLegJourneyIgnoresLeg1WhenNoViaConfigured() {
+        // Journey happens to have two named legs (the backend can return this for a plain
+        // from→to query even without a via param), but no via-station is configured —
+        // secondLegTrainNumber is nil. leg1 must never be surfaced or switched to, even
+        // once now is past leg0's real-time arrival.
+        let now = Date()
+        let journey = makeTwoLegJourney(
+            leg0: LegSpec(
+                name: "RJX 60", dep: iso8601(now.addingTimeInterval(-2400)), arr: iso8601(now.addingTimeInterval(-900))
+            ),
+            leg1: LegSpec(
+                name: "REX 1234", dep: iso8601(now.addingTimeInterval(-600)), arr: iso8601(now.addingTimeInterval(900))
+            )
+        )
+
+        let result = fetcher.findTrain(named: "RJX 60", in: [journey], now: now)
+        XCTAssertEqual(result?.trainName, "RJX 60")
+        XCTAssertNil(result?.nextLeg)
+    }
+
     // MARK: - buildOptions / deduplicated
 
     func test_buildOptions_twoLeg_computesOverallSpanAndSecondLegName() {

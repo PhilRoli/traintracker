@@ -90,7 +90,9 @@ final class TrainFetcher {
                 return nil
             }
         }
-        guard let trainData = buildTrainData(leg0: leg0, leg1: leg1, now: now) else {
+        guard let trainData = buildTrainData(
+            leg0: leg0, leg1: secondLegTrainNumber != nil ? leg1 : nil, now: now
+        ) else {
             cachedRefreshToken = nil
             return nil
         }
@@ -109,7 +111,9 @@ final class TrainFetcher {
             if let secondLegTrainNumber {
                 guard leg1?.line?.name == secondLegTrainNumber else { continue }
             }
-            guard let trainData = buildTrainData(leg0: leg0, leg1: leg1, now: now) else { continue }
+            guard let trainData = buildTrainData(
+                leg0: leg0, leg1: secondLegTrainNumber != nil ? leg1 : nil, now: now
+            ) else { continue }
             return (trainData, journey.refreshToken)
         }
         return nil
