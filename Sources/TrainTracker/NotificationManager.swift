@@ -20,6 +20,7 @@ final class NotificationManager {
     private var lastArrivalPlatform: String?
     private var departureReminderSentFor: String?
     private var arrivalReminderSentFor: String?
+    private var transferReminderSentFor: String?
 
     init(scheduler: NotificationScheduler = UNUserNotificationCenter.current()) {
         self.scheduler = scheduler
@@ -36,10 +37,12 @@ final class NotificationManager {
             lastArrivalPlatform = nil
             departureReminderSentFor = nil
             arrivalReminderSentFor = nil
+            transferReminderSentFor = nil
         }
 
         processDepartureReminder(data: data, settings: settings, key: key)
         processArrivalReminder(data: data, settings: settings, key: key)
+        processTransferReminder(data: data, settings: settings, key: key)
         processDelayAlert(data: data, settings: settings, key: key)
         processPlatformChange(data: data, settings: settings, key: key)
     }
@@ -87,6 +90,30 @@ final class NotificationManager {
 
         post(identifier: "arrival-\(key)", content: content)
         arrivalReminderSentFor = key
+    }
+
+    private func processTransferReminder(
+        data: TrainData,
+        settings: NotificationSettings,
+        key: String
+    ) {
+        guard settings.transferReminderEnabled, let nextLeg = data.nextLeg,
+              transferReminderSentFor != key
+        else { return }
+
+        let rtArr = data.scheduledArrival.addingTimeInterval(TimeInterval(data.arrivalDelaySecs))
+        let secsUntil = rtArr.timeIntervalSinceNow
+        guard secsUntil > 0, secsUntil <= Double(settings.transferReminderMinutes * 60) else { return }
+
+        let content = UNMutableNotificationContent()
+        let minsLeft = max(1, Int(secsUntil / 60))
+        content.title = "Transfer at \(data.toName) in \(minsLeft)m"
+        content.body = nextLeg.departurePlatform
+            .map { "\(nextLeg.trainName) to \(nextLeg.toName) — platform \($0)" }
+            ?? "\(nextLeg.trainName) to \(nextLeg.toName)"
+
+        post(identifier: "transfer-\(key)", content: content)
+        transferReminderSentFor = key
     }
 
     private func processDelayAlert(data: TrainData, settings: NotificationSettings, key: String) {

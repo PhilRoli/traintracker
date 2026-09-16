@@ -44,7 +44,8 @@ func makeTrainData(
     arrivalDelaySecs: Int = 0,
     departurePlatform: String? = nil,
     arrivalPlatform: String? = nil,
-    isEnRoute: Bool = false
+    isEnRoute: Bool = false,
+    nextLeg: TrainLegSummary? = nil
 ) -> TrainData {
     TrainData(
         trainName: trainName,
@@ -57,7 +58,8 @@ func makeTrainData(
         departurePlatform: departurePlatform,
         arrivalPlatform: arrivalPlatform,
         stopovers: [],
-        isEnRoute: isEnRoute
+        isEnRoute: isEnRoute,
+        nextLeg: nextLeg
     )
 }
 
