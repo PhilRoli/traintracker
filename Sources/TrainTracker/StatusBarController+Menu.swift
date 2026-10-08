@@ -232,10 +232,12 @@ extension StatusBarController {
 
     @objc private func openPreferences() {
         if prefsController == nil {
-            prefsController = PreferencesWindowController()
+            prefsController = PreferencesWindowController(configStore: configStore)
+            prefsController?.onRouteChanged = { [weak self] in
+                Task { await self?.refresh() }
+            }
             prefsController?.onClose = { [weak self] in
                 self?.prefsController = nil
-                Task { await self?.refresh() }
             }
         }
         prefsController?.showWindow(nil)
