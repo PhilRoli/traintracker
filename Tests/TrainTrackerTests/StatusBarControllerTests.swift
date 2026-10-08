@@ -1,6 +1,7 @@
 // Tests/TrainTrackerTests/StatusBarControllerTests.swift
 import XCTest
 import UserNotifications
+import MenuBarKit
 @testable import TrainTracker
 
 @MainActor

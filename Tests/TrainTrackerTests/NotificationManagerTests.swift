@@ -1,6 +1,7 @@
 // Tests/TrainTrackerTests/NotificationManagerTests.swift
 import XCTest
 import UserNotifications
+import MenuBarKit
 @testable import TrainTracker
 
 // MARK: - Spy
