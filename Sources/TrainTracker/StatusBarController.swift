@@ -2,25 +2,49 @@
 import AppKit
 import Network
 
+protocol TrainFetching {
+    func fetch(config: AppConfig) async -> TrainStatus
+}
+
+extension TrainFetcher: TrainFetching {}
+
 @MainActor
-final class StatusBarController {
+final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private var timer: Timer?
-    private let fetcher = TrainFetcher()
+    private let menu = NSMenu()
+    private var refreshTimer: Timer?
+    private var titleTimer: Timer?
+    private let configStore: AppConfigStore
+    private let fetcher: any TrainFetching
     private var consecutiveErrors = 0
     private var lastGoodStatus: TrainStatus = .noConfig   // shown during transient errors
+    private var displayStatus: TrainStatus = .noConfig
+    private var lastUpdated: Date?
     private var prefsController: PreferencesWindowController?
-    private let notificationManager = NotificationManager()
+    private let notificationManager: NotificationManager
     private var isRefreshing = false
     private var refreshRequestedWhileBusy = false
     private var lastRouteKey: String?
     private let pathMonitor = NWPathMonitor()
     private var wasOnline = true
 
-    init() {
+    init(
+        configStore: AppConfigStore = .shared,
+        fetcher: any TrainFetching = TrainFetcher(),
+        notificationManager: NotificationManager? = nil,
+        autostart: Bool = true
+    ) {
+        self.configStore = configStore
+        self.fetcher = fetcher
+        self.notificationManager = notificationManager ?? NotificationManager()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        super.init()
         statusItem.button?.title = "Train"
-        startTimer()
+        menu.delegate = self
+        statusItem.menu = menu
+        rebuildMenu()
+        guard autostart else { return }
+        startTitleTimer()
         observeWakeAndNetwork()
         Task { await refresh() }
     }
@@ -31,13 +55,13 @@ final class StatusBarController {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { Task { await self?.refresh() } }
+            Task { @MainActor in await self?.refresh() }
         }
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             Task { @MainActor in
                 guard let self else { return }
-                // Refresh only on offline → online, since the periodic timer covers steady state
+                // Refresh only on offline → online, since the scheduled refresh covers steady state
                 if online && !self.wasOnline { await self.refresh() }
                 self.wasOnline = online
             }
@@ -45,15 +69,58 @@ final class StatusBarController {
         pathMonitor.start(queue: DispatchQueue(label: "traintracker.network-path"))
     }
 
-    // MARK: - Timer
+    // MARK: - Timers
 
-    private func startTimer() {
-        let newTimer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
-            Task { [weak self] in await self?.refresh() }
+    /// Seconds until the next fetch, or nil when polling should pause (nothing to track, or already arrived).
+    nonisolated static func refreshInterval(for status: TrainStatus, now: Date = Date()) -> TimeInterval? {
+        switch status {
+        case .noConfig:
+            return nil
+        case .pickTrain:
+            return 120
+        case .error:
+            return 60
+        case .tracking(let trainData, _):
+            let rtArr = trainData.scheduledArrival.addingTimeInterval(TimeInterval(trainData.arrivalDelaySecs))
+            if rtArr <= now { return nil }
+            if trainData.isEnRoute { return 30 }
+            let rtDep = trainData.scheduledDeparture.addingTimeInterval(TimeInterval(trainData.departureDelaySecs))
+            return rtDep.timeIntervalSince(now) > 30 * 60 ? 120 : 30
         }
-        newTimer.tolerance = 5   // lets the system coalesce wakeups
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
+    }
+
+    private func scheduleNextRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        guard let interval = Self.refreshInterval(for: displayStatus) else { return }
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor in await self?.refresh() }
+        }
+        timer.tolerance = interval / 10   // lets the system coalesce wakeups
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    /// Re-renders the title between fetches so countdowns don't lag by a whole refresh interval.
+    private func startTitleTimer() {
+        let timer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateTitle() }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        titleTimer = timer
+    }
+
+    var titleForTesting: String { statusItem.button?.title ?? "" }
+
+    private func updateTitle() {
+        let title = Self.titleString(for: displayStatus, consecutiveErrors: consecutiveErrors)
+        statusItem.button?.title = title
+        if case .tracking = displayStatus {
+            configStore.setStatusLine(title)
+        } else {
+            configStore.setStatusLine(nil)
+        }
     }
 
     // MARK: - Refresh
@@ -73,7 +140,7 @@ final class StatusBarController {
     }
 
     private func performRefresh() async {
-        let config = AppConfigStore.shared.load()
+        let config = configStore.load()
 
         // Drop stale state from a previous route/train so it can't flash after switching
         let routeKey = [config.fromStation?.id, config.viaStation?.id, config.toStation?.id,
@@ -94,15 +161,11 @@ final class StatusBarController {
         }
 
         // Show last good data for transient errors; show error UI after 2 consecutive failures
-        let displayStatus: TrainStatus = consecutiveErrors >= 2 ? status : lastGoodStatus
-        let title = Self.titleString(for: displayStatus, consecutiveErrors: consecutiveErrors)
-        statusItem.button?.title = title
-        statusItem.menu = buildMenu(for: displayStatus)
-        if case .tracking = displayStatus {
-            AppConfigStore.shared.setStatusLine(title)
-        } else {
-            AppConfigStore.shared.setStatusLine(nil)
-        }
+        displayStatus = consecutiveErrors >= 2 ? status : lastGoodStatus
+        lastUpdated = Date()
+        updateTitle()
+        rebuildMenu()
+        scheduleNextRefresh()
 
         if case .tracking(let trainData, _) = displayStatus {
             notificationManager.process(trainData, settings: config.notifications)
@@ -111,6 +174,8 @@ final class StatusBarController {
 
     // MARK: - Title string (static for testability)
 
+    private nonisolated static let trainNoSuffix = #/\s*\(Train-No\.[^)]*\)/#
+
     nonisolated static func titleString(for status: TrainStatus, consecutiveErrors: Int, now: Date = Date()) -> String {
         switch status {
         case .noConfig, .pickTrain:
@@ -118,7 +183,7 @@ final class StatusBarController {
         case .error:
             return consecutiveErrors >= 2 ? "🚂 (!)" : "🚂"
         case .tracking(let trainData, _):
-            let shortName = trainData.trainName.replacing(#/\s*\(Train-No\.[^)]*\)/#, with: "")
+            let shortName = trainData.trainName.replacing(trainNoSuffix, with: "")
             let emoji = trainTypeEmoji(trainData.trainName)
             let rtArr = trainData.scheduledArrival.addingTimeInterval(TimeInterval(trainData.arrivalDelaySecs))
             let rtDep = trainData.scheduledDeparture.addingTimeInterval(TimeInterval(trainData.departureDelaySecs))
@@ -126,16 +191,21 @@ final class StatusBarController {
             if rtArr <= now {
                 return "\(emoji) \(shortName) Arrived"
             } else if trainData.isEnRoute {
-                let minsLeft = max(0, Int(rtArr.timeIntervalSince(now) / 60))
+                let minsLeft = minutesRoundedUp(rtArr.timeIntervalSince(now))
                 let delay = formatDelay(trainData.arrivalDelaySecs)
                 return delay.isEmpty
                     ? "\(emoji) \(shortName) \(minsLeft)m"
                     : "\(emoji) \(shortName) \(minsLeft)m \(delay)"
             } else {
-                let mins = max(0, Int(rtDep.timeIntervalSince(now) / 60))
+                let mins = minutesRoundedUp(rtDep.timeIntervalSince(now))
                 return "\(emoji) \(shortName) in \(mins)m"
             }
         }
+    }
+
+    /// Rounds up so a countdown never reads "0m" for the whole final minute.
+    private nonisolated static func minutesRoundedUp(_ seconds: TimeInterval) -> Int {
+        max(0, Int((seconds / 60).rounded(.up)))
     }
 
     // MARK: - Train type emoji
@@ -190,8 +260,22 @@ extension StatusBarController {
         return item
     }
 
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        rebuildMenu()
+    }
+
+    /// Rebuilds the items of the single status menu in place, so an open menu is never swapped out.
+    private func rebuildMenu() {
+        let fresh = buildMenu(for: displayStatus)
+        menu.removeAllItems()
+        for item in fresh.items {
+            fresh.removeItem(item)
+            menu.addItem(item)
+        }
+    }
+
     private func buildMenu(for status: TrainStatus) -> NSMenu {
-        let config = AppConfigStore.shared.load()
+        let config = configStore.load()
         let menu = NSMenu()
 
         switch status {
@@ -233,10 +317,16 @@ extension StatusBarController {
             addTrainOptions(options, to: switchSub, currentTrain: nil, currentSecondLeg: nil)
             switchItem.submenu = switchSub
             menu.addItem(switchItem)
+            if config.trainNumber != nil {
+                menu.addItem(action("Deselect Train", #selector(deselectTrain), key: ""))
+            }
             menu.addItem(makeRouteSubmenu(config: config))
         }
 
         menu.addItem(.separator())
+        if let lastUpdated {
+            menu.addItem(disabled("Updated \(Self.formatHHMM(lastUpdated, delaySecs: 0))"))
+        }
         menu.addItem(action("Preferences…", #selector(openPreferences), key: ","))
         menu.addItem(action("Refresh", #selector(manualRefresh), key: "r"))
         menu.addItem(.separator())
@@ -356,30 +446,30 @@ extension StatusBarController {
 extension StatusBarController {
     @objc private func selectTrain(_ sender: NSMenuItem) {
         guard let option = sender.representedObject as? TrainOption else { return }
-        var config = AppConfigStore.shared.load()
+        var config = configStore.load()
         config.trainNumber = option.name
         config.secondLegTrainNumber = option.secondLegName
-        AppConfigStore.shared.save(config)
+        configStore.save(config)
         Task { await refresh() }
     }
 
     @objc private func deselectTrain() {
-        var config = AppConfigStore.shared.load()
+        var config = configStore.load()
         config.trainNumber = nil
         config.secondLegTrainNumber = nil
-        AppConfigStore.shared.save(config)
+        configStore.save(config)
         Task { await refresh() }
     }
 
     @objc private func selectRoute(_ sender: NSMenuItem) {
         guard let route = sender.representedObject as? SavedRoute else { return }
-        var config = AppConfigStore.shared.load()
+        var config = configStore.load()
         config.fromStation = route.from
         config.viaStation = route.viaStation
         config.toStation = route.toStation
         config.trainNumber = nil
         config.secondLegTrainNumber = nil
-        AppConfigStore.shared.save(config)
+        configStore.save(config)
         Task { await refresh() }
     }
 

@@ -22,8 +22,11 @@ final class NotificationManager {
     private var arrivalReminderSentFor: String?
     private var transferReminderSentFor: String?
 
-    init(scheduler: NotificationScheduler = UNUserNotificationCenter.current()) {
+    private let now: () -> Date
+
+    init(scheduler: NotificationScheduler = UNUserNotificationCenter.current(), now: @escaping () -> Date = Date.init) {
         self.scheduler = scheduler
+        self.now = now
     }
 
     func process(_ data: TrainData, settings: NotificationSettings) {
@@ -60,7 +63,7 @@ final class NotificationManager {
         else { return }
 
         let rtDep = data.scheduledDeparture.addingTimeInterval(TimeInterval(data.departureDelaySecs))
-        let secsUntil = rtDep.timeIntervalSinceNow
+        let secsUntil = rtDep.timeIntervalSince(now())
         guard secsUntil > 0, secsUntil <= Double(settings.departureReminderMinutes * 60) else { return }
 
         let content = UNMutableNotificationContent()
@@ -78,7 +81,7 @@ final class NotificationManager {
         guard settings.arrivalReminderEnabled, data.nextLeg == nil, arrivalReminderSentFor != key else { return }
 
         let rtArr = data.scheduledArrival.addingTimeInterval(TimeInterval(data.arrivalDelaySecs))
-        let secsUntil = rtArr.timeIntervalSinceNow
+        let secsUntil = rtArr.timeIntervalSince(now())
         guard secsUntil > 0, secsUntil <= Double(settings.arrivalReminderMinutes * 60) else { return }
 
         let content = UNMutableNotificationContent()
@@ -102,7 +105,7 @@ final class NotificationManager {
         else { return }
 
         let rtArr = data.scheduledArrival.addingTimeInterval(TimeInterval(data.arrivalDelaySecs))
-        let secsUntil = rtArr.timeIntervalSinceNow
+        let secsUntil = rtArr.timeIntervalSince(now())
         guard secsUntil > 0, secsUntil <= Double(settings.transferReminderMinutes * 60) else { return }
 
         let content = UNMutableNotificationContent()
@@ -126,7 +129,7 @@ final class NotificationManager {
         let mins = (data.arrivalDelaySecs + 59) / 60
         content.title = "\(data.trainName) is now +\(mins)m late"
         content.body = "Arrives at \(data.toName)"
-        post(identifier: "delay-\(key)", content: content)
+        post(identifier: "delay-\(key)-\(mins)", content: content)
     }
 
     private func processPlatformChange(data: TrainData, settings: NotificationSettings, key: String) {
@@ -140,13 +143,13 @@ final class NotificationManager {
             let content = UNMutableNotificationContent()
             content.title = "\(data.trainName): departure platform changed"
             content.body = "Now departing from platform \(curr)"
-            post(identifier: "platform-dep-\(key)", content: content)
+            post(identifier: "platform-dep-\(key)-\(curr)", content: content)
         }
         if let prev = lastArrivalPlatform, let curr = data.arrivalPlatform, prev != curr {
             let content = UNMutableNotificationContent()
             content.title = "\(data.trainName): arrival platform changed"
             content.body = "Now arriving at platform \(curr)"
-            post(identifier: "platform-arr-\(key)", content: content)
+            post(identifier: "platform-arr-\(key)-\(curr)", content: content)
         }
     }
 

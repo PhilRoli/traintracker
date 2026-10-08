@@ -16,11 +16,21 @@ final class OeBBClient: OeBBClientProtocol {
     static let baseURL = "https://oebb.rolinek.at"
     private let session: URLSession
 
-    init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        session = URLSession(configuration: config)
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 15
+            self.session = URLSession(configuration: config)
+        }
     }
+
+    private nonisolated(unsafe) static let departureFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     // MARK: - URL constructors (static for testability)
 
@@ -34,9 +44,7 @@ final class OeBBClient: OeBBClientProtocol {
     }
 
     static func journeysURL(fromId: String, toId: String, departure: Date, viaId: String?) -> URL? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let depString = formatter.string(from: departure)
+        let depString = departureFormatter.string(from: departure)
         var components = URLComponents(string: "\(baseURL)/journeys")
         var queryItems = [
             URLQueryItem(name: "from", value: fromId),
