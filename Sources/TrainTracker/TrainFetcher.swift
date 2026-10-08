@@ -315,10 +315,19 @@ final class TrainFetcher {
 
     static func parseDate(_ dateString: String?) -> Date? {
         guard let dateString, !dateString.isEmpty else { return nil }
+        return plainFormatter.date(from: dateString) ?? fractionalFormatter.date(from: dateString)
+    }
+
+    // ISO8601DateFormatter is thread-safe; shared instances avoid allocating one per parsed date
+    private nonisolated(unsafe) static let plainFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: dateString) { return date }
+        return formatter
+    }()
+
+    private nonisolated(unsafe) static let fractionalFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: dateString)
-    }
+        return formatter
+    }()
 }

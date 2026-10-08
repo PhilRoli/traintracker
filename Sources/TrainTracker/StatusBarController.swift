@@ -1,5 +1,6 @@
 // Sources/TrainTracker/StatusBarController.swift
 import AppKit
+import Network
 
 @MainActor
 final class StatusBarController {
@@ -13,12 +14,35 @@ final class StatusBarController {
     private var isRefreshing = false
     private var refreshRequestedWhileBusy = false
     private var lastRouteKey: String?
+    private let pathMonitor = NWPathMonitor()
+    private var wasOnline = true
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "Train"
         startTimer()
+        observeWakeAndNetwork()
         Task { await refresh() }
+    }
+
+    // MARK: - Wake / network
+
+    private func observeWakeAndNetwork() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { Task { await self?.refresh() } }
+        }
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in
+                guard let self else { return }
+                // Refresh only on offline → online, since the periodic timer covers steady state
+                if online && !self.wasOnline { await self.refresh() }
+                self.wasOnline = online
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "traintracker.network-path"))
     }
 
     // MARK: - Timer
@@ -27,6 +51,7 @@ final class StatusBarController {
         let newTimer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.refresh() }
         }
+        newTimer.tolerance = 5   // lets the system coalesce wakeups
         RunLoop.main.add(newTimer, forMode: .common)
         timer = newTimer
     }
