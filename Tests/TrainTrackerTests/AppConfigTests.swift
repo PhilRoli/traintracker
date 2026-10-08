@@ -103,6 +103,20 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.notifications.departureReminderMinutes, 10)
     }
 
+    func test_decodesConfigWithoutSavedRoutes() throws {
+        let json = Data(#"{"trainNumber":"WB 912"}"#.utf8)
+        let config = try JSONDecoder().decode(AppConfig.self, from: json)
+        XCTAssertEqual(config.trainNumber, "WB 912")
+        XCTAssertTrue(config.savedRoutes.isEmpty)
+    }
+
+    func test_load_backsUpUndecodableConfig() {
+        let garbage = Data("not json".utf8)
+        UserDefaults(suiteName: store.suiteName)?.set(garbage, forKey: "config")
+        XCTAssertNil(store.load().fromStation)
+        XCTAssertEqual(store.corruptConfigBackup(), garbage)
+    }
+
     func test_setStatusLine_writesString() {
         store.setStatusLine("⚡ RJX 12m")
         let value = UserDefaults(suiteName: store.suiteName)?.string(forKey: "statusLine")
