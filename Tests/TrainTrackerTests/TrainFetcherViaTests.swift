@@ -62,7 +62,7 @@ final class TrainFetcherViaTests: XCTestCase {
 
     func test_findTrain_directTripIgnoresSecondLegParamWhenNil() {
         let now = Date()
-        let journey = makeJourney(
+        let journey = makeTwoLegJourney(
             trainName: "WB 912",
             plannedDep: iso8601(now.addingTimeInterval(-3600)),
             plannedArr: iso8601(now.addingTimeInterval(3600))
@@ -165,7 +165,7 @@ final class TrainFetcherViaTests: XCTestCase {
 // MARK: - Helpers
 
 extension TrainFetcherViaTests {
-    private func makeJourney(
+    private func makeTwoLegJourney(
         trainName: String,
         plannedDep: String,
         plannedArr: String = "2026-05-24T14:08:00+02:00",
@@ -220,19 +220,5 @@ extension TrainFetcherViaTests {
             departurePlatform: nil, arrivalPlatform: nil, stopovers: nil
         )
         return APIJourney(legs: [leg0Leg, leg1Leg], refreshToken: refreshToken)
-    }
-
-    private func makeConfig(fromId: String = "1", toId: String = "2", trainNumber: String? = nil) -> AppConfig {
-        var config = AppConfig()
-        config.fromStation = Station(name: "From", id: fromId)
-        config.toStation = Station(name: "To", id: toId)
-        config.trainNumber = trainNumber
-        return config
-    }
-
-    private func iso8601(_ date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.string(from: date)
     }
 }

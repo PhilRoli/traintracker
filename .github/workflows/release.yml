@@ -13,6 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Validate tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH[-suffix]" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: swift test
+
       - name: Package app
         id: package
         run: |
@@ -31,6 +41,8 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          body: |
+            SHA-256 (`${{ steps.package.outputs.archive }}`): `${{ steps.sha.outputs.sha256 }}`
           files: ${{ steps.package.outputs.archive }}
 
       - name: Checkout homebrew-tap
@@ -66,4 +78,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/traintracker.rb
           git diff --staged --quiet || git commit -m "traintracker ${{ github.ref_name }}"
-          git push
+          for attempt in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          echo "Failed to push cask update after 3 attempts" >&2
+          exit 1

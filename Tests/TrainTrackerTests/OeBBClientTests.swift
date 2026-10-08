@@ -57,3 +57,80 @@ final class OeBBClientTests: XCTestCase {
         XCTAssertTrue(url!.absoluteString.contains("tok%2Fabc"), "Slash must be encoded as %2F")
     }
 }
+
+// MARK: - HTTP behaviour (stubbed transport)
+
+final class StubURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var handler: ((URLRequest) throws -> (Int, Data))?
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        do {
+            let (status, data) = try Self.handler!(request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
+final class OeBBClientHTTPTests: XCTestCase {
+    private func makeClient() -> OeBBClient {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubURLProtocol.self]
+        return OeBBClient(session: URLSession(configuration: config))
+    }
+
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+    }
+
+    func test_searchStations_decodesLocations() async throws {
+        StubURLProtocol.handler = { _ in
+            (200, Data(#"[{"id":"1","name":"Linz/Donau Hbf","type":"stop"}]"#.utf8))
+        }
+        let results = try await makeClient().searchStations(query: "Linz")
+        XCTAssertEqual(results.map(\.name), ["Linz/Donau Hbf"])
+    }
+
+    func test_searchStations_httpErrorThrows() async {
+        StubURLProtocol.handler = { _ in (503, Data()) }
+        do {
+            _ = try await makeClient().searchStations(query: "Linz")
+            XCTFail("expected throw")
+        } catch OeBBError.httpError(let code) {
+            XCTAssertEqual(code, 503)
+        } catch {
+            XCTFail("unexpected error \(error)")
+        }
+    }
+
+    func test_refreshJourney_404SurfacesStatusCode() async {
+        StubURLProtocol.handler = { _ in (404, Data()) }
+        do {
+            _ = try await makeClient().refreshJourney(token: "tok")
+            XCTFail("expected throw")
+        } catch OeBBError.httpError(let code) {
+            XCTAssertEqual(code, 404)
+        } catch {
+            XCTFail("unexpected error \(error)")
+        }
+    }
+
+    func test_fetchJourneys_malformedBodyThrows() async {
+        StubURLProtocol.handler = { _ in (200, Data("{}".utf8)) }
+        do {
+            _ = try await makeClient().fetchJourneys(fromId: "1", toId: "2", departure: Date(), viaId: nil)
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertTrue(error is DecodingError)
+        }
+    }
+}

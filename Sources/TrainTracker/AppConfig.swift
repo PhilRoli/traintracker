@@ -112,7 +112,7 @@ struct AppConfig: Codable {
         toStation = try container.decodeIfPresent(Station.self, forKey: .toStation)
         trainNumber = try container.decodeIfPresent(String.self, forKey: .trainNumber)
         secondLegTrainNumber = try container.decodeIfPresent(String.self, forKey: .secondLegTrainNumber)
-        savedRoutes = try container.decode([SavedRoute].self, forKey: .savedRoutes)
+        savedRoutes = try container.decodeIfPresent([SavedRoute].self, forKey: .savedRoutes) ?? []
         notifications = try container.decodeIfPresent(
             NotificationSettings.self,
             forKey: .notifications
@@ -135,6 +135,7 @@ final class AppConfigStore {
     static let shared = AppConfigStore()
 
     private let key = "config"
+    private let corruptBackupKey = "config.corruptBackup"
     private let defaults: UserDefaults
     let suiteName: String
 
@@ -144,10 +145,20 @@ final class AppConfigStore {
     }
 
     func load() -> AppConfig {
-        guard let data = defaults.data(forKey: key),
-              let config = try? JSONDecoder().decode(AppConfig.self, from: data)
-        else { return AppConfig() }
-        return config
+        guard let data = defaults.data(forKey: key) else { return AppConfig() }
+        do {
+            return try JSONDecoder().decode(AppConfig.self, from: data)
+        } catch {
+            // Keep the unreadable payload so a later save doesn't destroy the user's only copy
+            NSLog("TrainTracker: config decode failed (\(error)); backed up raw data")
+            defaults.set(data, forKey: corruptBackupKey)
+            return AppConfig()
+        }
+    }
+
+    /// Raw config bytes that failed to decode on the last `load()`, if any.
+    func corruptConfigBackup() -> Data? {
+        defaults.data(forKey: corruptBackupKey)
     }
 
     func save(_ config: AppConfig) {

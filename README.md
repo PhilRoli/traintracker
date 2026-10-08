@@ -11,11 +11,13 @@ brew tap PhilRoli/tap
 brew install --cask traintracker
 ```
 
-TrainTracker is ad-hoc signed (not notarized). On first launch, right-click the app in Finder and choose "Open" to bypass Gatekeeper, or run:
+TrainTracker is ad-hoc signed, not notarized (no Apple Developer ID). On first launch macOS will block it. Either run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/TrainTracker.app
 ```
+
+or try to open it once, then allow it under **System Settings → Privacy & Security → Open Anyway** (on macOS 15+ right-click → Open no longer bypasses Gatekeeper).
 
 ### Build from source
 
@@ -27,7 +29,19 @@ cd traintracker
 ./rebuild.sh
 ```
 
-`rebuild.sh` builds a universal binary, assembles `TrainTracker.app`, installs it to `/Applications`, and launches it.
+`rebuild.sh` is a developer convenience: it builds a universal binary, assembles `TrainTracker.app`, replaces `/Applications/TrainTracker.app`, stops any running instance, and launches it.
+
+### Development
+
+```bash
+swift build
+swift test
+swiftlint --strict   # brew install swiftlint
+```
+
+### Uninstall
+
+Quit the app, delete `/Applications/TrainTracker.app` (or `brew uninstall --cask traintracker`), and optionally reset its settings with `defaults delete traintracker`.
 
 ## Usage
 
@@ -36,7 +50,7 @@ TrainTracker lives in the menu bar (no Dock icon). Open **Preferences…** from 
 - Search for and set your from/to stations
 - Pick a specific train once one is running, or let it auto-select
 - Save routes for one-click switching from the menu bar
-- Configure notifications (departure reminder, delay alert, platform change)
+- Configure notifications (departure, delay, arrival, and transfer reminders, platform change); every setting applies immediately
 - Turn on **Launch at Login**
 - Export or import your configuration as JSON
 
@@ -45,8 +59,9 @@ The menu bar title shows the tracked train's emoji, name, and countdown/delay; t
 ## Features
 
 - Real-time tracking against the ÖBB transport API, including delays and platform changes
-- Menu bar countdown to departure/arrival, updated every 30 seconds
-- Notifications: departure reminder, delay alert, platform change
+- Menu bar countdown to departure/arrival; polls every 30s while a train is close or en route, less often otherwise, and pauses after arrival
+- Refreshes on wake from sleep and when the network returns; shows when the service can't be reached instead of "train not found"
+- Notifications: departure, delay, arrival and transfer reminders, platform change
 - Saved routes, switchable directly from the menu bar
 - Launch at Login (via `SMAppService`)
 - Config export/import as JSON
@@ -60,17 +75,20 @@ Single Swift Package Manager executable target, split into focused files under `
 | --- | --- |
 | `main.swift` | App entry point |
 | `AppDelegate.swift` | App lifecycle |
-| `StatusBarController.swift` | Menu bar item, refresh timer, menu building |
-| `TrainFetcher.swift` | Journey fetching, train matching, refresh-token caching |
+| `StatusBarController.swift` / `StatusBarController+Menu.swift` | Menu bar item, adaptive refresh scheduling, menu building |
+| `TrainFetcher.swift` / `TrainFetcher+Building.swift` | Journey fetching, train matching, refresh-token caching |
 | `OeBBClient.swift` | ÖBB API client |
 | `Models.swift` | API response types and internal display types |
 | `AppConfig.swift` | Persisted configuration (`UserDefaults`) |
 | `ConfigTransfer.swift` | JSON export/import of configuration |
 | `NotificationManager.swift` | Departure/delay/platform-change notifications |
 | `LoginItemManaging.swift` | Launch-at-Login via `SMAppService` |
-| `PreferencesWindowController.swift` / `PreferencesWindowController+Actions.swift` | Preferences UI |
+| `PreferencesWindowController*.swift` | Preferences UI (live-apply; routes, notifications, config transfer) |
+| `PreferencesLogic.swift` | Pure preferences logic (route saving, minute choices, import sanitizing) |
 
-Data source: `https://oebb.rolinek.at/api`
+## Privacy
+
+TrainTracker has no telemetry. Its only network traffic is to the unofficial third-party ÖBB API at `https://oebb.rolinek.at` (station search, journeys, journey refresh), which has no SLA. Your configuration is stored locally in `UserDefaults` (suite `traintracker`).
 
 ## License
 
