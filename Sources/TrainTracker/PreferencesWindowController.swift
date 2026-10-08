@@ -1,6 +1,7 @@
 // Sources/TrainTracker/PreferencesWindowController.swift
 import AppKit
 import ServiceManagement
+import MenuBarKit
 
 /// Preferences apply live: every control writes to the config store as soon as it changes.
 @MainActor

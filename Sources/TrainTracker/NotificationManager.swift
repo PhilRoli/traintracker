@@ -1,13 +1,7 @@
 // Sources/TrainTracker/NotificationManager.swift
-import UserNotifications
 import Foundation
-
-protocol NotificationScheduler {
-    func add(_ request: UNNotificationRequest, withCompletionHandler completionHandler: (@Sendable (Error?) -> Void)?)
-    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
-}
-
-extension UNUserNotificationCenter: NotificationScheduler {}
+import MenuBarKit
+import UserNotifications
 
 @MainActor
 final class NotificationManager {
