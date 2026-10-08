@@ -5,37 +5,8 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-test:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Cache SwiftPM build
-        uses: actions/cache@v6
-        with:
-          path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift', 'Sources/**', 'Tests/**') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Build
-        run: swift build
-
-      - name: Test
-        run: swift test --parallel
-
-      - name: Package smoke test
-        run: ./scripts/package-app.sh 0.0.0-ci
-
-      - name: Install SwiftLint
-        run: brew install swiftlint
-
-      - name: Lint
-        run: swiftlint --strict
+  ci:
+    uses: PhilRoli/menubar-kit/.github/workflows/ci.yml@v1
+    with:
+      app: TrainTracker
