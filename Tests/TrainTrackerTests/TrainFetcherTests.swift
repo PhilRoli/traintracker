@@ -230,6 +230,42 @@ final class TrainFetcherTests: XCTestCase {
         XCTAssertEqual(fetchCount2, 24, "Full batch should fire after refresh failure")
     }
 
+    func test_transientRefreshErrorKeepsTokenAndReportsUnreachable() async {
+        let mock = MockOeBBClient()
+        let now = Date()
+        let journey = makeJourney(
+            trainName: "WB 912",
+            plannedDep: iso8601(now.addingTimeInterval(-600)),
+            plannedArr: iso8601(now.addingTimeInterval(3600)),
+            refreshToken: "tok-abc"
+        )
+        await mock.setup(journeys: [journey], refresh: journey)
+        let fetcher = TrainFetcher(client: mock)
+        let config = makeConfig(trainNumber: "WB 912")
+        _ = await fetcher.fetch(config: config)
+
+        await mock.setRefreshError(URLError(.notConnectedToInternet))
+        let status = await fetcher.fetch(config: config)
+        guard case .error(let message, _) = status else { return XCTFail("expected .error, got \(status)") }
+        XCTAssertEqual(message, TrainFetcher.unreachableMessage)
+        let fetchCount = await mock.fetchJourneysCallCount
+        XCTAssertEqual(fetchCount, 12, "Transient failure must not trigger a full refetch")
+
+        await mock.setRefreshError(nil)
+        let recovered = await fetcher.fetch(config: config)
+        guard case .tracking = recovered else { return XCTFail("expected .tracking, got \(recovered)") }
+        let refreshCount = await mock.refreshJourneyCallCount
+        XCTAssertEqual(refreshCount, 2, "Token should survive the transient failure")
+    }
+
+    func test_allJourneyRequestsFailing_reportsUnreachable() async {
+        let mock = MockOeBBClient()
+        await mock.setFetchError(URLError(.notConnectedToInternet))
+        let status = await TrainFetcher(client: mock).fetch(config: makeConfig())
+        guard case .error(let message, _) = status else { return XCTFail("expected .error, got \(status)") }
+        XCTAssertEqual(message, TrainFetcher.unreachableMessage)
+    }
+
     func test_cacheInvalidatedOnConfigChange() async {
         let mock = MockOeBBClient()
         let now = Date()
@@ -372,6 +408,7 @@ actor MockOeBBClient: OeBBClientProtocol {
     private(set) var journeysToReturn: [APIJourney] = []
     private(set) var refreshToReturn: APIJourney?
     private(set) var refreshError: Error?
+    private(set) var fetchError: Error?
     private(set) var fetchJourneysCallCount = 0
     private(set) var refreshJourneyCallCount = 0
     private(set) var lastViaId: String?
@@ -381,6 +418,9 @@ actor MockOeBBClient: OeBBClientProtocol {
         self.refreshToReturn = refresh
         self.refreshError = error
     }
+    func setFetchError(_ error: Error?) {
+        self.fetchError = error
+    }
     func setRefreshError(_ error: Error?) {
         self.refreshError = error
     }
@@ -389,6 +429,7 @@ actor MockOeBBClient: OeBBClientProtocol {
     func fetchJourneys(fromId: String, toId: String, departure: Date, viaId: String?) async throws -> [APIJourney] {
         fetchJourneysCallCount += 1
         lastViaId = viaId
+        if let fetchError { throw fetchError }
         return journeysToReturn
     }
 

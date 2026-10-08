@@ -10,6 +10,9 @@ final class StatusBarController {
     private var lastGoodStatus: TrainStatus = .noConfig   // shown during transient errors
     private var prefsController: PreferencesWindowController?
     private let notificationManager = NotificationManager()
+    private var isRefreshing = false
+    private var refreshRequestedWhileBusy = false
+    private var lastRouteKey: String?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -30,8 +33,32 @@ final class StatusBarController {
 
     // MARK: - Refresh
 
+    /// Serialized: a call during an in-flight refresh queues exactly one re-run with the latest config.
     func refresh() async {
+        if isRefreshing {
+            refreshRequestedWhileBusy = true
+            return
+        }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        repeat {
+            refreshRequestedWhileBusy = false
+            await performRefresh()
+        } while refreshRequestedWhileBusy
+    }
+
+    private func performRefresh() async {
         let config = AppConfigStore.shared.load()
+
+        // Drop stale state from a previous route/train so it can't flash after switching
+        let routeKey = [config.fromStation?.id, config.viaStation?.id, config.toStation?.id,
+                        config.trainNumber, config.secondLegTrainNumber].map { $0 ?? "" }.joined(separator: "|")
+        if routeKey != lastRouteKey {
+            lastRouteKey = routeKey
+            consecutiveErrors = 0
+            lastGoodStatus = .noConfig
+        }
+
         let status = await fetcher.fetch(config: config)
 
         if case .error = status {

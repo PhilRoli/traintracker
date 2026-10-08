@@ -10,7 +10,15 @@ final class TrainFetcher {
         return wideOffsets + quarterHourOffsets
     }()
 
-    // Refresh-token cache — all access is sequential via StatusBarController's timer
+    static let unreachableMessage = "Can't reach the ÖBB service — retrying"
+
+    private enum RefreshResult {
+        case success(TrainData)
+        case stale      // token expired or train no longer matches — do a full fetch
+        case unreachable // transient failure — keep the token and retry later
+    }
+
+    // Refresh-token cache — StatusBarController serializes refreshes, so access is sequential
     private var cachedRefreshToken: String?
     private var cachedConfigKey: String?
     private var cachedOptions: [TrainOption] = []
@@ -36,20 +44,26 @@ final class TrainFetcher {
         }
 
         if let token = cachedRefreshToken, let trainNumber = config.trainNumber {
-            if let trainData = await tryRefresh(
+            switch await tryRefresh(
                 token: token, trainNumber: trainNumber, secondLegTrainNumber: config.secondLegTrainNumber, now: now
             ) {
+            case .success(let trainData):
                 return .tracking(trainData, cachedOptions)
+            case .unreachable:
+                return .error(Self.unreachableMessage, cachedOptions)
+            case .stale:
+                break // tryRefresh cleared the token; fall through to full fetch
             }
-            // tryRefresh cleared the token on failure; fall through to full fetch
         }
 
-        let journeys = await fetchAllJourneys(
+        guard let journeys = await fetchAllJourneys(
             fromId: from.id,
             toId: destination.id,
             viaId: config.viaStation?.id,
             now: now
-        )
+        ) else {
+            return .error(Self.unreachableMessage, cachedOptions)
+        }
         let options = buildOptions(from: journeys)
         cachedOptions = options
 
@@ -75,29 +89,29 @@ final class TrainFetcher {
 
     private func tryRefresh(
         token: String, trainNumber: String, secondLegTrainNumber: String?, now: Date
-    ) async -> TrainData? {
-        guard let journey = try? await client.refreshJourney(token: token) else {
-            cachedRefreshToken = nil
-            return nil
-        }
-        guard let (leg0, leg1) = Self.namedLegs(in: journey), leg0.line?.name == trainNumber else {
-            cachedRefreshToken = nil
-            return nil
-        }
-        if let secondLegTrainNumber {
-            guard leg1?.line?.name == secondLegTrainNumber else {
+    ) async -> RefreshResult {
+        let journey: APIJourney
+        do {
+            journey = try await client.refreshJourney(token: token)
+        } catch {
+            // Only an explicit "gone" response invalidates the token; anything else is likely connectivity
+            if case OeBBError.httpError(let code) = error, code == 404 || code == 410 {
                 cachedRefreshToken = nil
-                return nil
+                return .stale
             }
+            return .unreachable
         }
-        guard let trainData = buildTrainData(
-            leg0: leg0, leg1: secondLegTrainNumber != nil ? leg1 : nil, now: now
-        ) else {
+        guard let (leg0, leg1) = Self.namedLegs(in: journey), leg0.line?.name == trainNumber,
+              secondLegTrainNumber == nil || leg1?.line?.name == secondLegTrainNumber,
+              let trainData = buildTrainData(
+                  leg0: leg0, leg1: secondLegTrainNumber != nil ? leg1 : nil, now: now
+              )
+        else {
             cachedRefreshToken = nil
-            return nil
+            return .stale
         }
         cachedRefreshToken = journey.refreshToken ?? token
-        return trainData
+        return .success(trainData)
     }
 
     private func findTrainWithToken(
@@ -127,17 +141,23 @@ final class TrainFetcher {
 
     // MARK: - Concurrent journey fetch
 
-    private func fetchAllJourneys(fromId: String, toId: String, viaId: String?, now: Date) async -> [APIJourney] {
-        await withTaskGroup(of: [APIJourney].self) { group in
+    /// Returns nil when every request failed (offline / server down), so callers can tell that apart from "no trains".
+    private func fetchAllJourneys(fromId: String, toId: String, viaId: String?, now: Date) async -> [APIJourney]? {
+        await withTaskGroup(of: [APIJourney]?.self) { group in
             for offset in Self.offsets {
                 let dep = now.addingTimeInterval(offset)
                 group.addTask { [self] in
-                    (try? await client.fetchJourneys(fromId: fromId, toId: toId, departure: dep, viaId: viaId)) ?? []
+                    try? await client.fetchJourneys(fromId: fromId, toId: toId, departure: dep, viaId: viaId)
                 }
             }
             var all: [APIJourney] = []
-            for await batch in group { all.append(contentsOf: batch) }
-            return Self.deduplicated(all)
+            var anySucceeded = false
+            for await batch in group {
+                guard let batch else { continue }
+                anySucceeded = true
+                all.append(contentsOf: batch)
+            }
+            return anySucceeded ? Self.deduplicated(all) : nil
         }
     }
 
