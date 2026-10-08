@@ -168,7 +168,10 @@ final class StatusBarControllerTests: XCTestCase {
 }
 
 private final class NoopScheduler: NotificationScheduler {
-    func add(_ request: UNNotificationRequest, withCompletionHandler completionHandler: (@Sendable (Error?) -> Void)?) {}
+    func add(
+        _ request: UNNotificationRequest,
+        withCompletionHandler completionHandler: (@Sendable (Error?) -> Void)?
+    ) {}
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool { true }
 }
 
