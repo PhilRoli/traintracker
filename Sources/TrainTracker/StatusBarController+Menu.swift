@@ -1,5 +1,6 @@
 // Sources/TrainTracker/StatusBarController+Menu.swift
 import AppKit
+import MenuBarKit
 
 // MARK: - Menu building
 
@@ -192,9 +193,7 @@ extension StatusBarController {
     }
 
     private func action(_ title: String, _ selector: Selector, key: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: selector, keyEquivalent: key)
-        item.target = self
-        return item
+        .item(title, action: selector, key: key, target: self)
     }
 }
 
