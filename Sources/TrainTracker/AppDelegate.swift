@@ -1,6 +1,13 @@
 // Sources/TrainTracker/AppDelegate.swift
 import AppKit
+import MenuBarKit
 import UserNotifications
+
+/// Accessory apps have no visible menu bar; without these items text fields can't use ⌘C/⌘V/⌘X/⌘A.
+@MainActor
+func installMainMenu() {
+    NSApp.mainMenu = MainMenu.make(appName: "TrainTracker")
+}
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -12,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMainMenu()
         UNUserNotificationCenter.current().delegate = self
         statusBarController = StatusBarController()
     }
