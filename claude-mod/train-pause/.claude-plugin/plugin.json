@@ -1,1 +1,0 @@
-{ "name": "train-pause", "version": "0.1.0", "description": "Tells every Claude Code session to finish up and pause shortly before the TrainTracker train arrives." }

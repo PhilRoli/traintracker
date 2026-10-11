@@ -1,4 +1,4 @@
-# TrainTracker
+# <img src="Packaging/icon.png" width="48" height="48" align="absmiddle" alt="TrainTracker icon"> TrainTracker
 
 macOS menu bar app for tracking Austrian (ÖBB) trains in real time.
 
@@ -21,15 +21,16 @@ or try to open it once, then allow it under **System Settings → Privacy & Secu
 
 ### Build from source
 
-Requires Swift 5.9+ / macOS 13+, no third-party dependencies:
+Requires Swift 5.9+ / macOS 13+. The only dependency is the first-party [MenuBarKit](https://github.com/PhilRoli/menubar-kit) package, which SwiftPM fetches automatically; `rebuild.sh` also needs the same repo cloned next to this one (or `MENUBAR_KIT` set):
 
 ```bash
+git clone https://github.com/PhilRoli/menubar-kit
 git clone https://github.com/PhilRoli/traintracker
 cd traintracker
 ./rebuild.sh
 ```
 
-`rebuild.sh` is a developer convenience: it builds a universal binary, assembles `TrainTracker.app`, replaces `/Applications/TrainTracker.app`, stops any running instance, and launches it.
+`rebuild.sh` is a developer convenience: it builds a universal binary, assembles `TrainTracker.app`, replaces `/Applications/TrainTracker.app`, stops any running instance, and launches it. Regenerate the icon with `../menubar-kit/scripts/make-icon.sh 🚆`.
 
 ### Development
 
@@ -38,6 +39,13 @@ swift build
 swift test
 swiftlint --strict   # brew install swiftlint
 ```
+
+### Integrations
+
+While a train is tracked, the app writes its arrival time to `~/.traintracker/arrival.json`
+(`{"arrival": <epoch seconds, delay included>}`) and removes the file otherwise. Any tool can read it, e.g.
+[traintracker-claude](https://github.com/PhilRoli/traintracker-claude), a Claude Code mod that tells sessions to
+wrap up before you arrive.
 
 ### Uninstall
 
