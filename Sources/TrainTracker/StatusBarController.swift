@@ -172,7 +172,22 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         if case .tracking(let trainData, _) = displayStatus {
             notificationManager.process(trainData, settings: config.notifications)
+            Self.publishArrival(trainData.scheduledArrival.addingTimeInterval(TimeInterval(trainData.arrivalDelaySecs)))
+        } else {
+            Self.publishArrival(nil)
         }
+    }
+
+    /// Writes the tracked train's arrival to ~/.traintracker/arrival.json (read by the train-pause Claude Code mod).
+    private nonisolated static func publishArrival(_ arrival: Date?) {
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".traintracker")
+        let file = dir.appendingPathComponent("arrival.json")
+        guard let arrival else {
+            try? FileManager.default.removeItem(at: file)
+            return
+        }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? Data("{\"arrival\":\(Int(arrival.timeIntervalSince1970))}".utf8).write(to: file, options: .atomic)
     }
 
     // MARK: - Title string (static for testability)
