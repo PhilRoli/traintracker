@@ -103,6 +103,7 @@ final class PreferencesWindowController: NSWindowController {
         let transferRow = NSStackView(views: [export, importButton])
         transferRow.spacing = 8
         stack.addArrangedSubview(transferRow)
+        stack.addArrangedSubview(PreferencesLayout.versionLabel())
     }
 
     private func buildRouteSection() {
