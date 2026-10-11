@@ -1,3 +1,5 @@
+<p align="center"><img src="Packaging/icon.png" width="128" alt="TrainTracker icon"></p>
+
 # TrainTracker
 
 macOS menu bar app for tracking Austrian (ÖBB) trains in real time.
