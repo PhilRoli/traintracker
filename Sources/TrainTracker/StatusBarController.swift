@@ -178,7 +178,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// Writes the tracked train's arrival to ~/.traintracker/arrival.json (read by the train-pause Claude Code mod).
+    /// Writes the tracked train's arrival to ~/.traintracker/arrival.json (for external integrations).
     private nonisolated static func publishArrival(_ arrival: Date?) {
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".traintracker")
         let file = dir.appendingPathComponent("arrival.json")

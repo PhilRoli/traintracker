@@ -39,6 +39,13 @@ swift test
 swiftlint --strict   # brew install swiftlint
 ```
 
+### Integrations
+
+While a train is tracked, the app writes its arrival time to `~/.traintracker/arrival.json`
+(`{"arrival": <epoch seconds, delay included>}`) and removes the file otherwise. Any tool can read it, e.g.
+[traintracker-claude](https://github.com/PhilRoli/traintracker-claude), a Claude Code mod that tells sessions to
+wrap up before you arrive.
+
 ### Uninstall
 
 Quit the app, delete `/Applications/TrainTracker.app` (or `brew uninstall --cask traintracker`), and optionally reset its settings with `defaults delete traintracker`.
