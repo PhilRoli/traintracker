@@ -13,6 +13,24 @@ final class PreferencesWindowControllerTests: XCTestCase {
         return (PreferencesWindowController(configStore: store), store)
     }
 
+    private func textFields(in view: NSView) -> [NSTextField] {
+        view.subviews.flatMap { sub -> [NSTextField] in
+            let nested = textFields(in: sub)
+            if let field = sub as? NSTextField { return [field] + nested }
+            return nested
+        }
+    }
+
+    func test_showsVersionLineInsideTheWindow() throws {
+        let (controller, _) = makeController()
+        let content = try XCTUnwrap(controller.window?.contentView)
+        let version = try XCTUnwrap(textFields(in: content).first {
+            $0.stringValue.hasPrefix("Version") || $0.stringValue == "Development build"
+        })
+        content.layoutSubtreeIfNeeded()
+        XCTAssertTrue(content.bounds.insetBy(dx: -1, dy: -1).contains(version.convert(version.bounds, to: content)))
+    }
+
     func test_loadsExistingConfigIntoControls() {
         var config = AppConfig()
         config.fromStation = linz
