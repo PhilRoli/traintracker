@@ -14,7 +14,7 @@ extension StatusBarController {
                 $0.from == from && $0.toStation == destination && $0.viaStation == config.viaStation
             }
         }
-        addRouteOptions(config.savedRoutes, to: sub, currentRoute: currentRoute)
+        addRouteOptions(config.savedEntries, to: sub, currentRoute: currentRoute)
         item.submenu = sub
         return item
     }
@@ -139,19 +139,28 @@ extension StatusBarController {
         }
     }
 
-    private func addRouteOptions(_ routes: [SavedRoute], to menu: NSMenu, currentRoute: SavedRoute?) {
-        for route in routes {
-            let item = NSMenuItem(
-                title: route.displayName,
-                action: #selector(selectRoute(_:)),
-                keyEquivalent: ""
-            )
-            item.representedObject = route
-            item.target = self
-            if route == currentRoute { item.state = .on }
-            menu.addItem(item)
+    private func addRouteOptions(_ entries: [SavedEntry], to menu: NSMenu, currentRoute: SavedRoute?) {
+        for entry in entries {
+            switch entry {
+            case .header(let title):
+                if #available(macOS 14.0, *) {
+                    menu.addItem(NSMenuItem.sectionHeader(title: title))
+                } else {
+                    menu.addItem(disabled(title))
+                }
+            case .route(let route):
+                let item = NSMenuItem(
+                    title: route.displayName,
+                    action: #selector(selectRoute(_:)),
+                    keyEquivalent: ""
+                )
+                item.representedObject = route
+                item.target = self
+                if route == currentRoute { item.state = .on }
+                menu.addItem(item)
+            }
         }
-        if routes.isEmpty {
+        if !entries.contains(where: { if case .route = $0 { return true } else { return false } }) {
             menu.addItem(disabled("No saved routes"))
         }
     }

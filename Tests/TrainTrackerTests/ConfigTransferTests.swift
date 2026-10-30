@@ -7,10 +7,10 @@ final class ConfigTransferTests: XCTestCase {
         config.fromStation = Station(name: "Linz/Donau Hbf", id: "8100013")
         config.toStation = Station(name: "Salzburg Hbf", id: "8100002")
         config.trainNumber = "WB 912"
-        config.savedRoutes = [SavedRoute(
+        config.savedEntries = [.route(SavedRoute(
             from: Station(name: "Linz/Donau Hbf", id: "8100013"),
             toStation: Station(name: "Salzburg Hbf", id: "8100002")
-        )]
+        ))]
         config.notifications.departureReminderMinutes = 5
 
         let data = try ConfigTransfer.exportData(config)

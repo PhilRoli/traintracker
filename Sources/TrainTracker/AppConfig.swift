@@ -17,11 +17,43 @@ struct SavedRoute: Codable, Equatable {
         case viaStation
     }
 
+    /// Whether this route is the one `config` currently tracks.
+    func matches(_ config: AppConfig) -> Bool {
+        config.fromStation == from && config.viaStation == viaStation && config.toStation == toStation
+    }
+
     var displayName: String {
         if let viaStation {
             return "\(from.name) → \(viaStation.name) → \(toStation.name)"
         }
         return "\(from.name) → \(toStation.name)"
+    }
+}
+
+/// One line of the saved-routes list: a route, or a named header that groups the routes below it.
+enum SavedEntry: Codable, Equatable {
+    case route(SavedRoute)
+    case header(String)
+
+    private enum CodingKeys: String, CodingKey { case header }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let title = try container.decodeIfPresent(String.self, forKey: .header) {
+            self = .header(title)
+        } else {
+            self = .route(try SavedRoute(from: decoder))
+        }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        switch self {
+        case .route(let route):
+            try route.encode(to: encoder)
+        case .header(let title):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(title, forKey: .header)
+        }
     }
 }
 
@@ -90,10 +122,14 @@ struct AppConfig: Codable {
     var toStation: Station?
     var trainNumber: String?
     var secondLegTrainNumber: String?
-    var savedRoutes: [SavedRoute]
+    /// Routes and headers in display order; stored under the `savedRoutes` key, so older configs still load.
+    var savedEntries: [SavedEntry]
+    var savedRoutes: [SavedRoute] {
+        savedEntries.compactMap { if case .route(let route) = $0 { return route } else { return nil } }
+    }
     var notifications: NotificationSettings = NotificationSettings()
 
-    init() { savedRoutes = [] }
+    init() { savedEntries = [] }
 
     enum CodingKeys: String, CodingKey {
         case fromStation
@@ -112,7 +148,7 @@ struct AppConfig: Codable {
         toStation = try container.decodeIfPresent(Station.self, forKey: .toStation)
         trainNumber = try container.decodeIfPresent(String.self, forKey: .trainNumber)
         secondLegTrainNumber = try container.decodeIfPresent(String.self, forKey: .secondLegTrainNumber)
-        savedRoutes = try container.decodeIfPresent([SavedRoute].self, forKey: .savedRoutes) ?? []
+        savedEntries = try container.decodeIfPresent([SavedEntry].self, forKey: .savedRoutes) ?? []
         notifications = try container.decodeIfPresent(
             NotificationSettings.self,
             forKey: .notifications
@@ -126,7 +162,7 @@ struct AppConfig: Codable {
         try container.encodeIfPresent(toStation, forKey: .toStation)
         try container.encodeIfPresent(trainNumber, forKey: .trainNumber)
         try container.encodeIfPresent(secondLegTrainNumber, forKey: .secondLegTrainNumber)
-        try container.encode(savedRoutes, forKey: .savedRoutes)
+        try container.encode(savedEntries, forKey: .savedRoutes)
         try container.encode(notifications, forKey: .notifications)
     }
 }

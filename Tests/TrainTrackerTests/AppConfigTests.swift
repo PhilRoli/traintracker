@@ -23,10 +23,10 @@ final class AppConfigTests: XCTestCase {
         config.fromStation = Station(name: "Linz/Donau Hbf", id: "8100013")
         config.toStation = Station(name: "Salzburg Hbf", id: "8100002")
         config.trainNumber = "WB 912"
-        config.savedRoutes = [SavedRoute(
+        config.savedEntries = [.route(SavedRoute(
             from: Station(name: "Linz/Donau Hbf", id: "8100013"),
             toStation: Station(name: "Salzburg Hbf", id: "8100002")
-        )]
+        ))]
 
         store.save(config)
         let loaded = store.load()
@@ -190,5 +190,18 @@ final class AppConfigTests: XCTestCase {
         let decoded = try JSONDecoder().decode(NotificationSettings.self, from: Data(legacyJSON.utf8))
         XCTAssertTrue(decoded.transferReminderEnabled)
         XCTAssertEqual(decoded.transferReminderMinutes, 10)
+    }
+
+    func test_savedEntries_roundTripHeadersAndKeepOldRouteFormat() throws {
+        let route = SavedRoute(
+            from: Station(name: "Salzburg Hbf", id: "1"), toStation: Station(name: "Linz/Donau Hbf", id: "2"))
+        var config = AppConfig()
+        config.savedEntries = [.header("Salzburg"), .route(route)]
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(config))
+        XCTAssertEqual(loaded.savedEntries, [.header("Salzburg"), .route(route)])
+        XCTAssertEqual(loaded.savedRoutes, [route])
+
+        let legacy = Data(#"{"savedRoutes":[{"from":{"name":"A","id":"1"},"to":{"name":"B","id":"2"}}]}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(AppConfig.self, from: legacy).savedRoutes.count, 1)
     }
 }
