@@ -57,8 +57,8 @@ TrainTracker lives in the menu bar (no Dock icon). Open **Preferences…** from 
 
 - Search for and set your from/to stations
 - Pick a specific train once one is running, or let it auto-select
-- Save routes for one-click switching from the menu bar
-- Configure notifications (departure, delay, arrival, and transfer reminders, platform change); every setting applies immediately
+- Save routes with **Save & Use** for one-click switching from the menu bar; drag to reorder them and group them under named headers
+- Configure notifications (departure, delay, arrival, and transfer reminders, platform change); notification and app settings apply immediately
 - Turn on **Launch at Login**
 - Export or import your configuration as JSON
 
@@ -70,7 +70,7 @@ The menu bar title shows the tracked train's emoji, name, and countdown/delay; t
 - Menu bar countdown to departure/arrival; polls every 30s while a train is close or en route, less often otherwise, and pauses after arrival
 - Refreshes on wake from sleep and when the network returns; shows when the service can't be reached instead of "train not found"
 - Notifications: departure, delay, arrival and transfer reminders, platform change
-- Saved routes, switchable directly from the menu bar
+- Saved routes, reorderable and grouped under headers, switchable directly from the menu bar
 - Launch at Login (via `SMAppService`)
 - Config export/import as JSON
 - Zero third-party dependencies — AppKit, URLSession, UserNotifications, ServiceManagement only
@@ -91,7 +91,7 @@ Single Swift Package Manager executable target, split into focused files under `
 | `ConfigTransfer.swift` | JSON export/import of configuration |
 | `NotificationManager.swift` | Departure/delay/platform-change notifications |
 | `LoginItemManaging.swift` | Launch-at-Login via `SMAppService` |
-| `PreferencesWindowController*.swift` | Preferences UI (live-apply; routes, notifications, config transfer) |
+| `PreferencesWindowController*.swift` | Preferences UI (routes, notifications, config transfer) |
 | `PreferencesLogic.swift` | Pure preferences logic (route saving, minute choices, import sanitizing) |
 
 ## Privacy
