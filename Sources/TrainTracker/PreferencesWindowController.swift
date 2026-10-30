@@ -3,7 +3,7 @@ import AppKit
 import ServiceManagement
 import MenuBarKit
 
-/// Preferences apply live: every control writes to the config store as soon as it changes.
+/// Notification and app settings apply live; the route is applied explicitly with "Save & Use".
 @MainActor
 final class PreferencesWindowController: NSWindowController {
     static let contentWidth: CGFloat = 400
@@ -25,11 +25,14 @@ final class PreferencesWindowController: NSWindowController {
     let resultsScrollView = NSScrollView()
     let resultsTable = NSTableView()
     let savedRoutesTable = DeletableTableView()
-    let deleteRouteButton = NSButton(title: "–", target: nil, action: nil)
+    let saveRouteButton = NSButton(title: "Save & Use", target: nil, action: nil)
+    let addHeaderButton = NSButton(title: "Add Header", target: nil, action: nil)
+    let saveStatusLabel = NSTextField(labelWithString: "")
+    var statusTimer: Timer?
     var activeField: ActiveField = .none
     var searchResults: [APILocation] = []
     var searchMessage: String?
-    var savedRoutes: [SavedRoute] = []
+    var savedEntries: [SavedEntry] = []
     var pendingFrom: Station?
     var pendingVia: Station?
     var pendingTo: Station?
@@ -41,6 +44,7 @@ final class PreferencesWindowController: NSWindowController {
     let platformCheck = NSButton(checkboxWithTitle: "Platform change alert", target: nil, action: nil)
     private let loginCheck = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
     private let stack = NSStackView()
+    private var fittedHeight: CGFloat = 0
 
     init(
         configStore: AppConfigStore = .shared,
@@ -52,7 +56,7 @@ final class PreferencesWindowController: NSWindowController {
         self.client = client ?? OeBBClient()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 400),
-            styleMask: [.titled, .closable], backing: .buffered, defer: false
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false
         )
         window.title = "Train Tracker"
         window.isReleasedWhenClosed = false
@@ -121,6 +125,7 @@ final class PreferencesWindowController: NSWindowController {
             routeStack.addArrangedSubview(row(entry.label, entry.field))
         }
         configureResultsView()
+        routeStack.addArrangedSubview(makeSaveRouteRow())
         stack.addArrangedSubview(routeStack)
     }
 
@@ -149,11 +154,19 @@ final class PreferencesWindowController: NSWindowController {
         return header
     }
 
-    /// Fits the window to its content, keeping the top-left corner fixed.
+    /// Keeps the window as tall as its content needs, preserving any extra height the user dragged in
+    /// (it only resizes vertically); the top-left corner stays fixed.
     func resizeToFit() {
         guard let window else { return }
+        let fitting = stack.fittingSize.height
+        let current = window.contentRect(forFrameRect: window.frame).height
+        let height = fittedHeight == 0 ? fitting : max(fitting, current + fitting - fittedHeight)
+        fittedHeight = fitting
+        let width = Self.contentWidth + 40
+        window.contentMinSize = NSSize(width: width, height: fitting)
+        window.contentMaxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
         let oldHeight = window.frame.height
-        window.setContentSize(NSSize(width: Self.contentWidth + 40, height: stack.fittingSize.height))
+        window.setContentSize(NSSize(width: width, height: height))
         var frame = window.frame
         frame.origin.y += oldHeight - frame.height
         window.setFrame(frame, display: true)
@@ -166,11 +179,12 @@ final class PreferencesWindowController: NSWindowController {
         pendingFrom = config.fromStation
         pendingVia = config.viaStation
         pendingTo = config.toStation
-        savedRoutes = config.savedRoutes
+        savedEntries = config.savedEntries
         fromField.stringValue = pendingFrom?.name ?? ""
         viaField.stringValue = pendingVia?.name ?? ""
         toField.stringValue = pendingTo?.name ?? ""
         savedRoutesTable.reloadData()
+        updateSaveButton()
         for (kind, popup) in reminderPopups {
             populate(popup, kind: kind, settings: config.notifications)
         }
