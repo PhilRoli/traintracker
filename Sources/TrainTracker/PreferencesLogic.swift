@@ -77,7 +77,7 @@ enum PreferencesLogic {
         config.toStation = destination
         if let from, let destination {
             let route = SavedRoute(from: from, toStation: destination, viaStation: via)
-            if !config.savedRoutes.contains(route) { config.savedRoutes.append(route) }
+            if !config.savedRoutes.contains(route) { config.savedEntries.append(.route(route)) }
         }
         if changed {
             config.trainNumber = nil

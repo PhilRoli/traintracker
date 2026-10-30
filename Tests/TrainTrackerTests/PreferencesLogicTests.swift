@@ -20,7 +20,7 @@ final class PreferencesLogicTests: XCTestCase {
         config.fromStation = linz
         config.toStation = salzburg
         config.trainNumber = "WB 912"
-        config.savedRoutes = [SavedRoute(from: linz, toStation: salzburg, viaStation: nil)]
+        config.savedEntries = [.route(SavedRoute(from: linz, toStation: salzburg, viaStation: nil))]
         let result = PreferencesLogic.applyingRoute(to: config, from: linz, via: nil, to: salzburg)
         XCTAssertEqual(result.savedRoutes.count, 1)
         XCTAssertEqual(result.trainNumber, "WB 912")

@@ -78,4 +78,43 @@ final class PreferencesWindowControllerTests: XCTestCase {
         XCTAssertEqual(store.load().toStation, salzburg)
         XCTAssertEqual(store.load().savedRoutes.count, 1)
     }
+
+    func test_pickingStationsDoesNotSaveUntilSaveAndUse() {
+        let (controller, store) = makeController()
+        controller.pendingFrom = linz
+        controller.pendingTo = salzburg
+        controller.updateSaveButton()
+
+        XCTAssertTrue(controller.saveRouteButton.isEnabled)
+        XCTAssertNil(store.load().toStation)
+
+        controller.saveRouteButton.performClick(nil)
+        XCTAssertEqual(store.load().toStation, salzburg)
+        XCTAssertFalse(controller.saveRouteButton.isEnabled, "nothing left to save")
+        XCTAssertEqual(controller.saveStatusLabel.stringValue, "Saved ✓")
+    }
+
+    func test_removeButtonDeletesItsRoute() {
+        var config = AppConfig()
+        config.savedEntries = [.route(SavedRoute(from: linz, toStation: salzburg))]
+        let (controller, store) = makeController(config: config)
+
+        let cell = controller.savedRoutesTable.view(atColumn: 0, row: 0, makeIfNecessary: true)
+        let remove = (cell as? NSStackView)?.views.compactMap { $0 as? NSButton }.first
+        XCTAssertNotNil(remove)
+        controller.removeRouteClicked(remove!)
+        XCTAssertTrue(store.load().savedRoutes.isEmpty)
+    }
+
+    func test_addHeaderAppendsAndPersistsWithoutTouchingRoutes() {
+        var config = AppConfig()
+        let route = SavedRoute(from: linz, toStation: salzburg)
+        config.savedEntries = [.route(route), .header("Linz")]
+        let (controller, store) = makeController(config: config)
+
+        controller.addHeader()
+        XCTAssertEqual(store.load().savedEntries.count, 3)
+        XCTAssertEqual(store.load().savedEntries.last, .header("New header"))
+        XCTAssertEqual(store.load().savedRoutes, [route])
+    }
 }
