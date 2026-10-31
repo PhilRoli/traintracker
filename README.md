@@ -70,6 +70,7 @@ The menu bar title shows the tracked train's emoji, name, and countdown/delay; t
 - Menu bar countdown to departure/arrival; polls every 30s while a train is close or en route, less often otherwise, and pauses after arrival
 - Refreshes on wake from sleep and when the network returns; shows when the service can't be reached instead of "train not found"
 - Notifications: departure, delay, arrival and transfer reminders, platform change
+- Transfer check for two-leg routes: the menu shows whether the connection is OK, unlikely or missed, from real-time delays
 - Saved routes, reorderable and grouped under headers, switchable directly from the menu bar
 - Launch at Login (via `SMAppService`)
 - Config export/import as JSON
