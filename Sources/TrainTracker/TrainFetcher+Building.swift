@@ -70,7 +70,8 @@ extension TrainFetcher {
             departureDelaySecs: leg.departureDelay ?? 0,
             arrivalDelaySecs: leg.arrivalDelay ?? 0,
             departurePlatform: leg.departurePlatform,
-            arrivalPlatform: leg.arrivalPlatform
+            arrivalPlatform: leg.arrivalPlatform,
+            reachable: leg.reachable
         )
     }
 

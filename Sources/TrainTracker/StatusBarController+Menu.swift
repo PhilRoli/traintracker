@@ -115,6 +115,7 @@ extension StatusBarController {
             let platformStr = nextLeg.departurePlatform.map { ", platform \($0)" } ?? ""
             let nextLine = "→ then \(nextEmoji) \(nextLeg.trainName) to \(nextLeg.toName)\(platformStr) (\(nextDep))"
             menu.addItem(disabled(nextLine))
+            if let connection = trainData.connection { menu.addItem(disabled(connection.text)) }
         }
     }
 
