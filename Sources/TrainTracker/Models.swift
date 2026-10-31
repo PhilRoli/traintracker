@@ -42,6 +42,8 @@ struct APILeg: Codable {
     let departurePlatform: String?
     let arrivalPlatform: String?
     let stopovers: [APIStopover]?
+    /// Upstream's verdict on whether this leg can still be boarded given the previous leg's real-time data.
+    var reachable: Bool?
 }
 
 struct APIJourney: Codable {
@@ -76,6 +78,26 @@ struct TrainLegSummary {
     let arrivalDelaySecs: Int
     let departurePlatform: String?
     let arrivalPlatform: String?
+    var reachable: Bool?
+}
+
+/// Whether the transfer into the next leg still works, from the real-time gap and upstream's `reachable` flag.
+struct ConnectionAssessment: Equatable {
+    let gapSecs: Int
+    let reachable: Bool?
+
+    var isLikely: Bool { reachable != false && gapSecs >= 60 }
+
+    var text: String {
+        let minutes = gapSecs / 60
+        if gapSecs < 0 {
+            let missedBy = Int((-Double(gapSecs) / 60).rounded(.up))
+            return "⚠️ Connection missed — next train leaves \(missedBy) min before arrival"
+        }
+        if isLikely { return "✅ Connection OK — \(minutes) min to change" }
+        let detail = minutes == 0 ? "no time to change" : "only \(minutes) min to change"
+        return "⚠️ Connection unlikely — \(detail)"
+    }
 }
 
 struct TrainData {
@@ -118,6 +140,14 @@ struct TrainData {
         self.stopovers = stopovers
         self.isEnRoute = isEnRoute
         self.nextLeg = nextLeg
+    }
+
+    /// Real-time gap between arriving on this leg and the next one leaving; nil without a next leg.
+    var connection: ConnectionAssessment? {
+        guard let nextLeg else { return nil }
+        let arrives = scheduledArrival.addingTimeInterval(TimeInterval(arrivalDelaySecs))
+        let departs = nextLeg.scheduledDeparture.addingTimeInterval(TimeInterval(nextLeg.departureDelaySecs))
+        return ConnectionAssessment(gapSecs: Int(departs.timeIntervalSince(arrives)), reachable: nextLeg.reachable)
     }
 }
 
