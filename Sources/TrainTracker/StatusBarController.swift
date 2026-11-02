@@ -1,5 +1,6 @@
 // Sources/TrainTracker/StatusBarController.swift
 import AppKit
+import MenuBarKit
 import Network
 
 protocol TrainFetching {
@@ -52,10 +53,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // MARK: - Wake / network
 
     private func observeWakeAndNetwork() {
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in await self?.refresh() }
+        _ = observeWake { [weak self] in
+            Task { await self?.refresh() }
         }
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
